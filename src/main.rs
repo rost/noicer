@@ -16,6 +16,8 @@ where
 
     terminal::enable_raw_mode()?;
 
+    let mut cursor = 0;
+
     loop {
         queue!(
             w,
@@ -25,17 +27,25 @@ where
             cursor::MoveTo(1, 1)
         )?;
 
-        for line in screen_lines() {
+        let screen_lines = screen_lines(cursor);
+
+        for line in &screen_lines {
             queue!(w, style::Print(line), cursor::MoveToNextLine(1))?;
         }
 
         w.flush()?;
 
         match read_char()? {
-            // '1' => test::cursor::run(w)?,
-            // '2' => test::color::run(w)?,
-            // '3' => test::attribute::run(w)?,
-            // '4' => test::event::run(w)?,
+            'j' => {
+                if cursor + 1 < (screen_lines.len() - 2) as i32 {
+                    cursor += 1;
+                }
+            }
+            'k' => {
+                if cursor - 1 >= 0 {
+                    cursor -= 1;
+                }
+            }
             'q' => break,
             _ => {}
         };
@@ -72,7 +82,8 @@ fn main() -> Result<()> {
     run(&mut stdout)
 }
 
-fn screen_lines() -> Vec<String> {
+fn screen_lines(cursor: i32) -> Vec<String> {
+    let cursor = cursor + 2;
     let mut lines = Vec::new();
     let current_dir = std::env::current_dir().unwrap();
     lines.push(format!("{}", current_dir.display()));
@@ -87,5 +98,8 @@ fn screen_lines() -> Vec<String> {
             lines.push(format!("   {}", dir));
         }
     }
+
+    lines[cursor as usize] = format!(" > {}", lines[cursor as usize].trim_start());
+
     lines
 }

@@ -46,6 +46,18 @@ where
                     cursor -= 1;
                 }
             }
+            'h' => {
+                std::env::set_current_dir("..")?;
+            }
+            'l' => {
+                let path = screen_lines[(cursor + 2) as usize].trim_start();
+                if path.ends_with('/') {
+                    let newdir = path.trim_end_matches('/');
+                    let newdir = str::replace(&newdir, ">", " ");
+                    let newdir = newdir.trim_start();
+                    std::env::set_current_dir(newdir)?;
+                }
+            }
             'q' => break,
             _ => {}
         };

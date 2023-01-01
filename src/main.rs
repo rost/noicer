@@ -48,14 +48,18 @@ where
             }
             'h' => {
                 std::env::set_current_dir("..")?;
+                cursor = 0;
             }
             'l' => {
                 let path = screen_lines[(cursor + 2) as usize].trim_start();
+                let newdir = path.trim_end_matches('/');
+                let newdir = str::replace(&newdir, ">", " ");
+                let newdir = newdir.trim_start();
+                let current_dir = std::env::current_dir().unwrap();
+                let newdir = current_dir.join(newdir);
                 if path.ends_with('/') {
-                    let newdir = path.trim_end_matches('/');
-                    let newdir = str::replace(&newdir, ">", " ");
-                    let newdir = newdir.trim_start();
                     std::env::set_current_dir(newdir)?;
+                    cursor = 0;
                 }
             }
             'q' => break,
@@ -100,15 +104,23 @@ fn screen_lines(cursor: i32) -> Vec<String> {
     let current_dir = std::env::current_dir().unwrap();
     lines.push(format!("{}", current_dir.display()));
     lines.push(String::from(""));
+
+    let mut entries = Vec::new();
     for entry in std::fs::read_dir(".").unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         let dir = path.file_name().unwrap().to_str().unwrap();
         if path.is_dir() {
-            lines.push(format!("   {}/", dir));
+            entries.push(format!("   {}/", dir));
         } else {
-            lines.push(format!("   {}", dir));
+            entries.push(format!("   {}", dir));
         }
+    }
+
+    entries.sort();
+
+    for entry in entries {
+        lines.push(entry);
     }
 
     lines[cursor as usize] = format!(" > {}", lines[cursor as usize].trim_start());

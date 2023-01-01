@@ -8,6 +8,11 @@ pub use crossterm::{
     Command, Result,
 };
 
+pub struct State {
+    pub cursor: i32,
+    pub screen_lines: Vec<String>,
+}
+
 fn run<W>(w: &mut W) -> Result<()>
 where
     W: Write,
@@ -16,7 +21,10 @@ where
 
     terminal::enable_raw_mode()?;
 
-    let mut cursor = 0;
+    let mut state = State {
+        cursor: 0,
+        screen_lines: get_screen_lines(0),
+    };
 
     loop {
         queue!(
@@ -27,9 +35,12 @@ where
             cursor::MoveTo(1, 1)
         )?;
 
-        let screen_lines = screen_lines(cursor);
+        state = State {
+            cursor: state.cursor,
+            screen_lines: get_screen_lines(state.cursor),
+        };
 
-        for line in &screen_lines {
+        for line in &state.screen_lines {
             queue!(w, style::Print(line), cursor::MoveToNextLine(1))?;
         }
 
@@ -37,21 +48,21 @@ where
 
         match read_char()? {
             'j' => {
-                if cursor + 1 < (screen_lines.len() - 2) as i32 {
-                    cursor += 1;
+                if state.cursor + 1 < (state.screen_lines.len() - 2) as i32 {
+                    state.cursor += 1;
                 }
             }
             'k' => {
-                if cursor - 1 >= 0 {
-                    cursor -= 1;
+                if state.cursor - 1 >= 0 {
+                    state.cursor -= 1;
                 }
             }
             'h' => {
                 std::env::set_current_dir("..")?;
-                cursor = 0;
+                state.cursor = 0;
             }
             'l' => {
-                let path = screen_lines[(cursor + 2) as usize].trim_start();
+                let path = state.screen_lines[(state.cursor + 2) as usize].trim_start();
                 let newdir = path.trim_end_matches('/');
                 let newdir = str::replace(&newdir, ">", " ");
                 let newdir = newdir.trim_start();
@@ -59,7 +70,7 @@ where
                 let newdir = current_dir.join(newdir);
                 if path.ends_with('/') {
                     std::env::set_current_dir(newdir)?;
-                    cursor = 0;
+                    state.cursor = 0;
                 }
             }
             'q' => break,
@@ -98,7 +109,7 @@ fn main() -> Result<()> {
     run(&mut stdout)
 }
 
-fn screen_lines(cursor: i32) -> Vec<String> {
+fn get_screen_lines(cursor: i32) -> Vec<String> {
     let cursor = cursor + 2;
     let mut lines = Vec::new();
     let current_dir = std::env::current_dir().unwrap();

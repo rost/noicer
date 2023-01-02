@@ -47,23 +47,10 @@ where
         w.flush()?;
 
         match read_char()? {
-            'j' => {
-                if state.cursor + 1 < (state.screen_lines.len() - 2) as i32 {
-                    state.cursor += 1;
-                }
-            }
-            'k' => {
-                if state.cursor - 1 >= 0 {
-                    state.cursor -= 1;
-                }
-            }
-            'h' => {
-                std::env::set_current_dir("..")?;
-                state.cursor = 0;
-            }
-            'l' => {
-                state.cursor = move_into_dir(&state)?;
-            }
+            'j' => state.cursor = move_down(&state)?,
+            'k' => state.cursor = move_up(&state)?,
+            'h' => state.cursor = move_out_of_dir(&state)?,
+            'l' => state.cursor = move_into_dir(&state)?,
             'q' => break,
             _ => {}
         };
@@ -77,6 +64,29 @@ where
     )?;
 
     terminal::disable_raw_mode()
+}
+
+fn move_down(state: &State) -> Result<i32> {
+    let cursor = if state.cursor + 1 < (state.screen_lines.len() - 2) as i32 {
+        state.cursor + 1
+    } else {
+        state.cursor
+    };
+    Ok(cursor)
+}
+
+fn move_up(state: &State) -> Result<i32> {
+    let cursor = if state.cursor - 1 >= 0 {
+        state.cursor - 1
+    } else {
+        0
+    };
+    Ok(cursor)
+}
+
+fn move_out_of_dir(_state: &State) -> Result<i32> {
+    std::env::set_current_dir("..")?;
+    Ok(0)
 }
 
 fn move_into_dir(state: &State) -> Result<i32> {

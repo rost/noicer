@@ -62,16 +62,7 @@ where
                 state.cursor = 0;
             }
             'l' => {
-                let path = state.screen_lines[(state.cursor + 2) as usize].trim_start();
-                let newdir = path.trim_end_matches('/');
-                let newdir = str::replace(&newdir, ">", " ");
-                let newdir = newdir.trim_start();
-                let current_dir = std::env::current_dir().unwrap();
-                let newdir = current_dir.join(newdir);
-                if path.ends_with('/') {
-                    std::env::set_current_dir(newdir)?;
-                    state.cursor = 0;
-                }
+                state.cursor = move_into_dir(&state)?;
             }
             'q' => break,
             _ => {}
@@ -86,6 +77,19 @@ where
     )?;
 
     terminal::disable_raw_mode()
+}
+
+fn move_into_dir(state: &State) -> Result<i32> {
+    let path = state.screen_lines[(state.cursor + 2) as usize].trim_start();
+    let newdir = path.trim_end_matches('/');
+    let newdir = str::replace(&newdir, ">", " ");
+    let newdir = newdir.trim_start();
+    let current_dir = std::env::current_dir().unwrap();
+    let newdir = current_dir.join(newdir);
+    if path.ends_with('/') {
+        std::env::set_current_dir(newdir).unwrap();
+    }
+    Ok(0)
 }
 
 pub fn read_char() -> Result<char> {

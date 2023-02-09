@@ -1,4 +1,7 @@
-use std::io::{self, Write};
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+};
 
 pub use crossterm::{
     cursor,
@@ -10,6 +13,8 @@ pub use crossterm::{
 
 pub struct State {
     pub cursor: i32,
+    pub dir: String,
+    pub paths: HashMap<String, i32>,
     pub screen_lines: Vec<String>,
 }
 
@@ -23,7 +28,13 @@ where
 
     let mut state = State {
         cursor: 0,
-        screen_lines: get_screen_lines(0),
+        dir: std::env::current_dir()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string(),
+        screen_lines: format_screen_lines(0),
+        paths: HashMap::new(),
     };
 
     loop {
@@ -35,10 +46,16 @@ where
             cursor::MoveTo(1, 1)
         )?;
 
-        state = State {
-            cursor: state.cursor,
-            screen_lines: get_screen_lines(state.cursor),
+        let current_dir = std::env::current_dir().unwrap();
+        state.dir = current_dir.to_str().unwrap().to_string();
+
+        state.cursor = if state.paths.contains_key(state.dir.as_str()) {
+            state.paths.get(state.dir.as_str()).unwrap().clone()
+        } else {
+            0
         };
+
+        state.screen_lines = format_screen_lines(state.cursor);
 
         for line in &state.screen_lines {
             queue!(w, style::Print(line), cursor::MoveToNextLine(1))?;
@@ -54,6 +71,8 @@ where
             'q' => break,
             _ => {}
         };
+
+        state.paths.insert(state.dir.to_string(), state.cursor);
     }
 
     execute!(
@@ -84,9 +103,9 @@ fn move_up(state: &State) -> Result<i32> {
     Ok(cursor)
 }
 
-fn move_out_of_dir(_state: &State) -> Result<i32> {
+fn move_out_of_dir(state: &State) -> Result<i32> {
     std::env::set_current_dir("..")?;
-    Ok(0)
+    Ok(state.cursor)
 }
 
 fn move_into_dir(state: &State) -> Result<i32> {
@@ -99,7 +118,7 @@ fn move_into_dir(state: &State) -> Result<i32> {
     if path.ends_with('/') {
         std::env::set_current_dir(newdir).unwrap();
     }
-    Ok(0)
+    Ok(state.cursor)
 }
 
 pub fn read_char() -> Result<char> {
@@ -123,7 +142,7 @@ fn main() -> Result<()> {
     run(&mut stdout)
 }
 
-fn get_screen_lines(cursor: i32) -> Vec<String> {
+fn format_screen_lines(cursor: i32) -> Vec<String> {
     let cursor = cursor + 2;
     let mut lines = Vec::new();
     let current_dir = std::env::current_dir().unwrap();

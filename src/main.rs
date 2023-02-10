@@ -11,10 +11,25 @@ pub use crossterm::{
     Command, Result,
 };
 
+pub struct Op {
+    pub op_type: String,
+    pub path: Option<String>,
+}
+
+impl Op {
+    pub fn new(op_type: String, path: String) -> Op {
+        Op {
+            op_type,
+            path: Some(path),
+        }
+    }
+}
+
 pub struct State {
     pub cursor: i32,
     pub dir: String,
     pub paths: HashMap<String, i32>,
+    pub prev_op: Option<Op>,
     pub screen_lines: Vec<String>,
 }
 
@@ -35,6 +50,7 @@ where
             .to_string(),
         screen_lines: format_screen_lines(0),
         paths: HashMap::new(),
+        prev_op: None,
     };
 
     loop {
@@ -52,7 +68,11 @@ where
         state.cursor = if state.paths.contains_key(state.dir.as_str()) {
             state.paths.get(state.dir.as_str()).unwrap().clone()
         } else {
-            0
+            match &state.prev_op {
+                Some(op) if op.op_type == "out" => 0,
+                Some(_) => 0,
+                None => 0,
+            }
         };
 
         state.screen_lines = format_screen_lines(state.cursor);
@@ -64,12 +84,25 @@ where
         w.flush()?;
 
         match read_char()? {
-            'j' => state.cursor = move_down(&state)?,
-            'k' => state.cursor = move_up(&state)?,
-            'h' => state.cursor = move_out_of_dir(&state)?,
-            'l' => state.cursor = move_into_dir(&state)?,
+            'j' => {
+                state.cursor = move_down(&state)?;
+                state.prev_op = None;
+            }
+            'k' => {
+                state.cursor = move_up(&state)?;
+                state.prev_op = None;
+            }
+            'h' => {
+                let (cursor, op) = move_out_of_dir(&state)?;
+                state.cursor = cursor;
+                state.prev_op = op
+            }
+            'l' => {
+                state.cursor = move_into_dir(&state)?;
+                state.prev_op = None;
+            }
             'q' => break,
-            _ => {}
+            _ => (),
         };
 
         state.paths.insert(state.dir.to_string(), state.cursor);
@@ -103,9 +136,10 @@ fn move_up(state: &State) -> Result<i32> {
     Ok(cursor)
 }
 
-fn move_out_of_dir(state: &State) -> Result<i32> {
+fn move_out_of_dir(state: &State) -> Result<(i32, Option<Op>)> {
+    let op = Some(Op::new(String::from("out"), String::from(&state.dir)));
     std::env::set_current_dir("..")?;
-    Ok(state.cursor)
+    Ok((state.cursor, op))
 }
 
 fn move_into_dir(state: &State) -> Result<i32> {

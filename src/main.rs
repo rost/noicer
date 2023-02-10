@@ -33,7 +33,7 @@ pub struct State {
     pub screen_lines: Vec<String>,
 }
 
-fn run<W>(w: &mut W) -> Result<()>
+fn run<W>(w: &mut W) -> anyhow::Result<()>
 where
     W: Write,
 {
@@ -43,12 +43,8 @@ where
 
     let mut state = State {
         cursor: 0,
-        dir: std::env::current_dir()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string(),
-        screen_lines: format_screen_lines(0, get_screen_lines()),
+        dir: format!("{:?}", std::env::current_dir()?),
+        screen_lines: format_screen_lines(0, get_screen_lines()?)?,
         paths: HashMap::new(),
         prev_op: None,
     };
@@ -62,21 +58,33 @@ where
             cursor::MoveTo(1, 1)
         )?;
 
-        let current_dir = std::env::current_dir().unwrap();
-        state.dir = current_dir.to_str().unwrap().to_string();
+        let current_dir = std::env::current_dir()?;
+        state.dir = match current_dir.to_str() {
+            Some(dir) => dir.to_string(),
+            None => "".to_string(),
+        };
 
         state.cursor = if state.paths.contains_key(state.dir.as_str()) {
-            state.paths.get(state.dir.as_str()).unwrap().clone()
+            match state.paths.get(state.dir.as_str()) {
+                Some(cursor) => *cursor,
+                None => 0,
+            }
         } else {
             match &state.prev_op {
                 Some(op) if op.op_type == "out" => {
-                    let path = op.path.as_ref().unwrap();
+                    let path = match op.path.as_ref() {
+                        Some(path) => path,
+                        None => "",
+                    };
                     let paths = path.split('/').collect::<Vec<&str>>();
-                    let last = paths.last().unwrap();
-                    let index = get_screen_lines()
-                        .iter()
-                        .position(|x| x.contains(last))
-                        .unwrap();
+                    let last = match paths.last() {
+                        Some(last) => last.to_string(),
+                        None => "".to_string(),
+                    };
+                    let index = match get_screen_lines()?.iter().position(|x| x.contains(&last)) {
+                        Some(index) => index,
+                        None => 0,
+                    };
                     index as i32
                 }
                 Some(_) => 0,
@@ -84,7 +92,7 @@ where
             }
         };
 
-        state.screen_lines = format_screen_lines(state.cursor, get_screen_lines());
+        state.screen_lines = format_screen_lines(state.cursor, get_screen_lines()?)?;
 
         for line in &state.screen_lines {
             queue!(w, style::Print(line), cursor::MoveToNextLine(1))?;
@@ -124,7 +132,7 @@ where
         terminal::LeaveAlternateScreen
     )?;
 
-    terminal::disable_raw_mode()
+    Ok(terminal::disable_raw_mode()?)
 }
 
 fn move_down(state: &State) -> Result<i32> {
@@ -156,10 +164,10 @@ fn move_into_dir(state: &State) -> Result<i32> {
     let newdir = path.trim_end_matches('/');
     let newdir = str::replace(&newdir, ">", " ");
     let newdir = newdir.trim_start();
-    let current_dir = std::env::current_dir().unwrap();
+    let current_dir = std::env::current_dir()?;
     let newdir = current_dir.join(newdir);
     if path.ends_with('/') {
-        std::env::set_current_dir(newdir).unwrap();
+        std::env::set_current_dir(newdir)?;
     }
     Ok(state.cursor)
 }
@@ -180,17 +188,24 @@ pub fn buffer_size() -> Result<(u16, u16)> {
     terminal::size()
 }
 
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     let mut stdout = io::stdout();
-    run(&mut stdout)
+    run(&mut stdout)?;
+    Ok(())
 }
 
-fn get_screen_lines() -> Vec<String> {
+fn get_screen_lines() -> Result<Vec<String>> {
     let mut entries = Vec::new();
-    for entry in std::fs::read_dir(".").unwrap() {
-        let entry = entry.unwrap();
+    for entry in std::fs::read_dir(".")? {
+        let entry = entry?;
         let path = entry.path();
-        let dir = path.file_name().unwrap().to_str().unwrap();
+        let dir = match path.file_name() {
+            Some(dir) => match dir.to_str() {
+                Some(dir) => dir.to_string(),
+                None => "".to_string(),
+            },
+            None => "".to_string(),
+        };
         if path.is_dir() {
             entries.push(format!("   {}/", dir));
         } else {
@@ -199,14 +214,14 @@ fn get_screen_lines() -> Vec<String> {
     }
 
     entries.sort();
-    entries
+    Ok(entries)
 }
 
-fn format_screen_lines(cursor: i32, mut content: Vec<String>) -> Vec<String> {
+fn format_screen_lines(cursor: i32, mut content: Vec<String>) -> Result<Vec<String>> {
     content[cursor as usize] = format!(" > {}", content[cursor as usize].trim_start());
 
     let mut lines = Vec::new();
-    let current_dir = std::env::current_dir().unwrap();
+    let current_dir = std::env::current_dir()?;
     lines.push(format!("{}", current_dir.display()));
     lines.push(String::from(""));
 
@@ -214,5 +229,5 @@ fn format_screen_lines(cursor: i32, mut content: Vec<String>) -> Vec<String> {
         lines.push(entry);
     }
 
-    lines
+    Ok(lines)
 }

@@ -48,7 +48,7 @@ where
             .to_str()
             .unwrap()
             .to_string(),
-        screen_lines: format_screen_lines(0),
+        screen_lines: format_screen_lines(0, get_screen_lines()),
         paths: HashMap::new(),
         prev_op: None,
     };
@@ -75,7 +75,7 @@ where
             }
         };
 
-        state.screen_lines = format_screen_lines(state.cursor);
+        state.screen_lines = format_screen_lines(state.cursor, get_screen_lines());
 
         for line in &state.screen_lines {
             queue!(w, style::Print(line), cursor::MoveToNextLine(1))?;
@@ -176,13 +176,7 @@ fn main() -> Result<()> {
     run(&mut stdout)
 }
 
-fn format_screen_lines(cursor: i32) -> Vec<String> {
-    let cursor = cursor + 2;
-    let mut lines = Vec::new();
-    let current_dir = std::env::current_dir().unwrap();
-    lines.push(format!("{}", current_dir.display()));
-    lines.push(String::from(""));
-
+fn get_screen_lines() -> Vec<String> {
     let mut entries = Vec::new();
     for entry in std::fs::read_dir(".").unwrap() {
         let entry = entry.unwrap();
@@ -196,12 +190,20 @@ fn format_screen_lines(cursor: i32) -> Vec<String> {
     }
 
     entries.sort();
+    entries
+}
 
-    for entry in entries {
+fn format_screen_lines(cursor: i32, mut content: Vec<String>) -> Vec<String> {
+    content[cursor as usize] = format!(" > {}", content[cursor as usize].trim_start());
+
+    let mut lines = Vec::new();
+    let current_dir = std::env::current_dir().unwrap();
+    lines.push(format!("{}", current_dir.display()));
+    lines.push(String::from(""));
+
+    for entry in content {
         lines.push(entry);
     }
-
-    lines[cursor as usize] = format!(" > {}", lines[cursor as usize].trim_start());
 
     lines
 }

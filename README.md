@@ -4,7 +4,7 @@ A simple file browser for the terminal. Inspired by `noice`.
 
 - [x] basic navigation using `h/j/k/l`
   - [x] store cursor position for each directory
-  - [ ] when moving up the tree, move cursor to the directory we came from
+  - [x] when moving up the tree, move cursor to the directory we came from
 - [ ] graceful handling of empty directories
 - [ ] support for opening files
   - [ ] config file with supported file types and programs to execute

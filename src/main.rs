@@ -69,7 +69,16 @@ where
             state.paths.get(state.dir.as_str()).unwrap().clone()
         } else {
             match &state.prev_op {
-                Some(op) if op.op_type == "out" => 0,
+                Some(op) if op.op_type == "out" => {
+                    let path = op.path.as_ref().unwrap();
+                    let paths = path.split('/').collect::<Vec<&str>>();
+                    let last = paths.last().unwrap();
+                    let index = get_screen_lines()
+                        .iter()
+                        .position(|x| x.contains(last))
+                        .unwrap();
+                    index as i32
+                }
                 Some(_) => 0,
                 None => 0,
             }

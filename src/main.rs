@@ -40,6 +40,18 @@ struct State {
     screen_lines: Vec<String>,
 }
 
+impl State {
+    fn new() -> Result<State> {
+        Ok(State {
+            cursor: 0,
+            dir: std::env::current_dir()?,
+            paths: HashMap::new(),
+            prev_op: None,
+            screen_lines: format_screen_lines(0, get_dir_content()?)?,
+        })
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     let mut stdout = io::stdout();
     run(&mut stdout)?;
@@ -54,13 +66,7 @@ where
 
     terminal::enable_raw_mode()?;
 
-    let mut state = State {
-        cursor: 0,
-        dir: std::env::current_dir()?,
-        screen_lines: format_screen_lines(0, get_dir_content()?)?,
-        paths: HashMap::new(),
-        prev_op: None,
-    };
+    let mut state = State::new()?;
 
     loop {
         queue!(

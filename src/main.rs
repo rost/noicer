@@ -212,12 +212,16 @@ fn get_screen_lines() -> Result<Vec<String>> {
             entries.push(format!("   {}", dir));
         }
     }
-
     entries.sort();
     Ok(entries)
 }
 
-fn format_screen_lines(cursor: i32, mut content: Vec<String>) -> Result<Vec<String>> {
+fn format_screen_lines(cursor: i32, content: Vec<String>) -> Result<Vec<String>> {
+    let mut content = match content.len() > 0 {
+        true => content,
+        false => vec![String::from("   ../")],
+    };
+
     content[cursor as usize] = format!(" > {}", content[cursor as usize].trim_start());
 
     let mut lines = Vec::new();

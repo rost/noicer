@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     ffi::OsStr,
     io::{self, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 pub use crossterm::{
@@ -117,13 +117,10 @@ fn cursor_position(state: &State) -> Result<i32> {
                     },
                     None => OsStr::new(""),
                 };
-                let index = match get_dir_content()?
+                let index = get_dir_content()?
                     .iter()
                     .position(|x| x.file_name() == Some(last))
-                {
-                    Some(index) => index,
-                    None => 0,
-                };
+                    .unwrap_or(0);
                 index as i32
             }
             Some(_) => 0,
@@ -136,24 +133,24 @@ fn cursor_position(state: &State) -> Result<i32> {
 fn handle_keypress<'a>(char: &char, state: &'a mut State) -> Result<&'a mut State> {
     let state = match char {
         'j' => {
-            state.cursor = move_down(&state)?;
+            state.cursor = move_down(state)?;
             state.prev_op = None;
             state
         }
         'k' => {
-            state.cursor = move_up(&state)?;
+            state.cursor = move_up(state)?;
             state.prev_op = None;
             state
         }
         'h' => {
-            let cursor = move_out_of_dir(&state)?;
+            let cursor = move_out_of_dir(state)?;
             let op = Some(Op::new(OpKind::Out, state.dir.clone()));
             state.cursor = cursor;
             state.prev_op = op;
             state
         }
         'l' => {
-            state.cursor = move_into_dir(&state)?;
+            state.cursor = move_into_dir(state)?;
             state.prev_op = None;
             state
         }
@@ -174,7 +171,7 @@ fn get_dir_content() -> Result<Vec<PathBuf>> {
 }
 
 fn format_screen_lines(cursor: i32, content: Vec<PathBuf>) -> Result<Vec<String>> {
-    let content = match content.len() > 0 {
+    let content = match !content.is_empty() {
         true => content,
         false => vec![PathBuf::from("   ../")],
     };
@@ -194,12 +191,12 @@ fn format_screen_lines(cursor: i32, content: Vec<PathBuf>) -> Result<Vec<String>
     Ok(lines)
 }
 
-fn pathbuf_to_string(path: &PathBuf) -> String {
+fn pathbuf_to_string(path: &Path) -> String {
     match path.file_name() {
         Some(v) => match v.to_str() {
             Some(v) => match path.is_dir() {
-                true => format!("   {}/", v),
-                false => format!("   {}", v),
+                true => format!("   {v}/"),
+                false => format!("   {v}"),
             },
             None => "".to_string(),
         },
@@ -229,7 +226,7 @@ fn move_down(state: &State) -> Result<i32> {
 }
 
 fn move_up(state: &State) -> Result<i32> {
-    let cursor = if state.cursor - 1 >= 0 {
+    let cursor = if state.cursor > 0 {
         state.cursor - 1
     } else {
         0
@@ -245,7 +242,7 @@ fn move_out_of_dir(state: &State) -> Result<i32> {
 fn move_into_dir(state: &State) -> Result<i32> {
     let path = state.screen_lines[(state.cursor + 2) as usize].trim_start();
     let newdir = path.trim_end_matches('/');
-    let newdir = str::replace(&newdir, ">", " ");
+    let newdir = str::replace(newdir, ">", " ");
     let newdir = newdir.trim_start();
     let current_dir = std::env::current_dir()?;
     let newdir = current_dir.join(newdir);

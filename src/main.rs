@@ -5,26 +5,26 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub use crossterm::{
+use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent},
     execute, queue, style,
     terminal::{self, ClearType},
-    Command, Result,
+    Result,
 };
 
 #[derive(PartialEq)]
-pub enum OpKind {
+enum OpKind {
     Out,
 }
 
-pub struct Op {
-    pub kind: OpKind,
-    pub path: Option<PathBuf>,
+struct Op {
+    kind: OpKind,
+    path: Option<PathBuf>,
 }
 
 impl Op {
-    pub fn new(kind: OpKind, path: PathBuf) -> Op {
+    fn new(kind: OpKind, path: PathBuf) -> Op {
         Op {
             kind,
             path: Some(path),
@@ -32,12 +32,12 @@ impl Op {
     }
 }
 
-pub struct State {
-    pub cursor: i32,
-    pub dir: PathBuf,
-    pub paths: HashMap<PathBuf, i32>,
-    pub prev_op: Option<Op>,
-    pub screen_lines: Vec<String>,
+struct State {
+    cursor: i32,
+    dir: PathBuf,
+    paths: HashMap<PathBuf, i32>,
+    prev_op: Option<Op>,
+    screen_lines: Vec<String>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -204,7 +204,7 @@ fn pathbuf_to_string(path: &Path) -> String {
     }
 }
 
-pub fn read_char() -> Result<char> {
+fn read_char() -> Result<char> {
     loop {
         if let Ok(Event::Key(KeyEvent {
             code: KeyCode::Char(c),

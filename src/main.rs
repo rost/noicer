@@ -73,34 +73,7 @@ where
 
         state.dir = std::env::current_dir()?;
 
-        state.cursor = if state.paths.contains_key(&state.dir) {
-            match state.paths.get(&state.dir) {
-                Some(cursor) => *cursor,
-                None => 0,
-            }
-        } else {
-            match &state.prev_op {
-                Some(op) if op.kind == OpKind::Out => {
-                    let last = match op.path.as_ref() {
-                        Some(path) => match path.file_name() {
-                            Some(v) => v,
-                            None => OsStr::new(""),
-                        },
-                        None => OsStr::new(""),
-                    };
-                    let index = match get_dir_content()?
-                        .iter()
-                        .position(|x| x.file_name() == Some(last))
-                    {
-                        Some(index) => index,
-                        None => 0,
-                    };
-                    index as i32
-                }
-                Some(_) => 0,
-                None => 0,
-            }
-        };
+        state.cursor = cursor_position(&state)?;
 
         state.screen_lines = format_screen_lines(state.cursor, get_dir_content()?)?;
 
@@ -111,25 +84,8 @@ where
         w.flush()?;
 
         match read_char()? {
-            'j' => {
-                state.cursor = move_down(&state)?;
-                state.prev_op = None;
-            }
-            'k' => {
-                state.cursor = move_up(&state)?;
-                state.prev_op = None;
-            }
-            'h' => {
-                let (cursor, op) = move_out_of_dir(&state)?;
-                state.cursor = cursor;
-                state.prev_op = op
-            }
-            'l' => {
-                state.cursor = move_into_dir(&state)?;
-                state.prev_op = None;
-            }
             'q' => break,
-            _ => (),
+            char => handle_keypress(&char, &mut state)?,
         };
 
         state.paths.insert(state.dir, state.cursor);
@@ -143,6 +99,67 @@ where
     )?;
 
     Ok(terminal::disable_raw_mode()?)
+}
+
+fn cursor_position(state: &State) -> Result<i32> {
+    let cursor = if state.paths.contains_key(&state.dir) {
+        match state.paths.get(&state.dir) {
+            Some(cursor) => *cursor,
+            None => 0,
+        }
+    } else {
+        match &state.prev_op {
+            Some(op) if op.kind == OpKind::Out => {
+                let last = match op.path.as_ref() {
+                    Some(path) => match path.file_name() {
+                        Some(v) => v,
+                        None => OsStr::new(""),
+                    },
+                    None => OsStr::new(""),
+                };
+                let index = match get_dir_content()?
+                    .iter()
+                    .position(|x| x.file_name() == Some(last))
+                {
+                    Some(index) => index,
+                    None => 0,
+                };
+                index as i32
+            }
+            Some(_) => 0,
+            None => 0,
+        }
+    };
+    Ok(cursor)
+}
+
+fn handle_keypress<'a>(char: &char, state: &'a mut State) -> Result<&'a mut State> {
+    let state = match char {
+        'j' => {
+            state.cursor = move_down(&state)?;
+            state.prev_op = None;
+            state
+        }
+        'k' => {
+            state.cursor = move_up(&state)?;
+            state.prev_op = None;
+            state
+        }
+        'h' => {
+            let cursor = move_out_of_dir(&state)?;
+            let op = Some(Op::new(OpKind::Out, state.dir.clone()));
+            state.cursor = cursor;
+            state.prev_op = op;
+            state
+        }
+        'l' => {
+            state.cursor = move_into_dir(&state)?;
+            state.prev_op = None;
+            state
+        }
+        _ => state,
+    };
+    Ok(state)
 }
 
 fn get_dir_content() -> Result<Vec<PathBuf>> {
@@ -220,10 +237,9 @@ fn move_up(state: &State) -> Result<i32> {
     Ok(cursor)
 }
 
-fn move_out_of_dir(state: &State) -> Result<(i32, Option<Op>)> {
-    let op = Some(Op::new(OpKind::Out, state.dir.clone()));
+fn move_out_of_dir(state: &State) -> Result<i32> {
     std::env::set_current_dir("..")?;
-    Ok((state.cursor, op))
+    Ok(state.cursor)
 }
 
 fn move_into_dir(state: &State) -> Result<i32> {

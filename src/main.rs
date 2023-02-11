@@ -35,6 +35,12 @@ pub struct State {
     pub screen_lines: Vec<String>,
 }
 
+fn main() -> anyhow::Result<()> {
+    let mut stdout = io::stdout();
+    run(&mut stdout)?;
+    Ok(())
+}
+
 fn run<W>(w: &mut W) -> anyhow::Result<()>
 where
     W: Write,
@@ -134,65 +140,6 @@ where
     Ok(terminal::disable_raw_mode()?)
 }
 
-fn move_down(state: &State) -> Result<i32> {
-    let cursor = if state.cursor + 1 < (state.screen_lines.len() - 2) as i32 {
-        state.cursor + 1
-    } else {
-        state.cursor
-    };
-    Ok(cursor)
-}
-
-fn move_up(state: &State) -> Result<i32> {
-    let cursor = if state.cursor - 1 >= 0 {
-        state.cursor - 1
-    } else {
-        0
-    };
-    Ok(cursor)
-}
-
-fn move_out_of_dir(state: &State) -> Result<(i32, Option<Op>)> {
-    let op = Some(Op::new(String::from("out"), state.dir.clone()));
-    std::env::set_current_dir("..")?;
-    Ok((state.cursor, op))
-}
-
-fn move_into_dir(state: &State) -> Result<i32> {
-    let path = state.screen_lines[(state.cursor + 2) as usize].trim_start();
-    let newdir = path.trim_end_matches('/');
-    let newdir = str::replace(&newdir, ">", " ");
-    let newdir = newdir.trim_start();
-    let current_dir = std::env::current_dir()?;
-    let newdir = current_dir.join(newdir);
-    if path.ends_with('/') {
-        std::env::set_current_dir(newdir)?;
-    }
-    Ok(state.cursor)
-}
-
-pub fn read_char() -> Result<char> {
-    loop {
-        if let Ok(Event::Key(KeyEvent {
-            code: KeyCode::Char(c),
-            ..
-        })) = event::read()
-        {
-            return Ok(c);
-        }
-    }
-}
-
-pub fn buffer_size() -> Result<(u16, u16)> {
-    terminal::size()
-}
-
-fn main() -> anyhow::Result<()> {
-    let mut stdout = io::stdout();
-    run(&mut stdout)?;
-    Ok(())
-}
-
 fn get_dir_content() -> Result<Vec<PathBuf>> {
     let mut entries = Vec::new();
     for entry in std::fs::read_dir(".")? {
@@ -236,4 +183,53 @@ fn pathbuf_to_string(path: &PathBuf) -> String {
         },
         None => "".to_string(),
     }
+}
+
+pub fn read_char() -> Result<char> {
+    loop {
+        if let Ok(Event::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            ..
+        })) = event::read()
+        {
+            return Ok(c);
+        }
+    }
+}
+
+fn move_down(state: &State) -> Result<i32> {
+    let cursor = if state.cursor + 1 < (state.screen_lines.len() - 2) as i32 {
+        state.cursor + 1
+    } else {
+        state.cursor
+    };
+    Ok(cursor)
+}
+
+fn move_up(state: &State) -> Result<i32> {
+    let cursor = if state.cursor - 1 >= 0 {
+        state.cursor - 1
+    } else {
+        0
+    };
+    Ok(cursor)
+}
+
+fn move_out_of_dir(state: &State) -> Result<(i32, Option<Op>)> {
+    let op = Some(Op::new(String::from("out"), state.dir.clone()));
+    std::env::set_current_dir("..")?;
+    Ok((state.cursor, op))
+}
+
+fn move_into_dir(state: &State) -> Result<i32> {
+    let path = state.screen_lines[(state.cursor + 2) as usize].trim_start();
+    let newdir = path.trim_end_matches('/');
+    let newdir = str::replace(&newdir, ">", " ");
+    let newdir = newdir.trim_start();
+    let current_dir = std::env::current_dir()?;
+    let newdir = current_dir.join(newdir);
+    if path.ends_with('/') {
+        std::env::set_current_dir(newdir)?;
+    }
+    Ok(state.cursor)
 }

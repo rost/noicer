@@ -13,15 +13,20 @@ pub use crossterm::{
     Command, Result,
 };
 
+#[derive(PartialEq)]
+pub enum OpKind {
+    Out,
+}
+
 pub struct Op {
-    pub op_type: String,
+    pub kind: OpKind,
     pub path: Option<PathBuf>,
 }
 
 impl Op {
-    pub fn new(op_type: String, path: PathBuf) -> Op {
+    pub fn new(kind: OpKind, path: PathBuf) -> Op {
         Op {
-            op_type,
+            kind,
             path: Some(path),
         }
     }
@@ -75,7 +80,7 @@ where
             }
         } else {
             match &state.prev_op {
-                Some(op) if op.op_type == "out" => {
+                Some(op) if op.kind == OpKind::Out => {
                     let last = match op.path.as_ref() {
                         Some(path) => match path.file_name() {
                             Some(v) => v,
@@ -216,7 +221,7 @@ fn move_up(state: &State) -> Result<i32> {
 }
 
 fn move_out_of_dir(state: &State) -> Result<(i32, Option<Op>)> {
-    let op = Some(Op::new(String::from("out"), state.dir.clone()));
+    let op = Some(Op::new(OpKind::Out, state.dir.clone()));
     std::env::set_current_dir("..")?;
     Ok((state.cursor, op))
 }

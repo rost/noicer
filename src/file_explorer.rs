@@ -32,8 +32,6 @@ where
             cursor::MoveTo(1, 1)
         )?;
 
-        cursor.before()?;
-
         let screen_lines = format_lines(&cursor)?;
         for line in screen_lines {
             queue!(w, style::Print(line), cursor::MoveToNextLine(1))?;
@@ -45,8 +43,6 @@ where
             'q' => break,
             char => handle_keypress(&char, &mut cursor)?,
         };
-
-        cursor.after()?;
     }
 
     execute!(
@@ -75,7 +71,7 @@ fn format_lines(cursor: &Cursor) -> Result<Vec<String>> {
         lines.push(format_pathbuf(&entry)?);
     }
 
-    let index = (cursor.pos() + 2) as usize;
+    let index = (cursor.pos()? + 2) as usize;
     lines[index] = format!(" > {}", lines[index].trim_start());
 
     Ok(lines)
@@ -111,8 +107,8 @@ fn handle_keypress(char: &char, arrow: &mut Cursor) -> Result<()> {
     match char {
         'j' => arrow.move_down()?,
         'k' => arrow.move_up()?,
-        'h' => arrow.move_out_of_dir()?,
-        'l' => arrow.move_into_dir()?,
+        'h' => arrow.move_out()?,
+        'l' => arrow.move_in()?,
         _ => (),
     };
     Ok(())

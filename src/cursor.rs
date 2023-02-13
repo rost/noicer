@@ -2,129 +2,105 @@ use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
 
 use crossterm::Result;
 
-#[derive(PartialEq)]
-enum OpKind {
-    Out,
-}
-
-struct Op {
-    kind: OpKind,
-    path: PathBuf,
-}
-
-impl Op {
-    fn new(kind: OpKind, path: PathBuf) -> Op {
-        Op { kind, path }
-    }
-}
-
 pub struct Cursor {
-    dir: PathBuf,
-    paths: HashMap<PathBuf, i32>,
-    point: i32,
-    prev_op: Option<Op>,
+    cwd: PathBuf,
+    paths: HashMap<PathBuf, PathBuf>,
+    selected: PathBuf,
 }
 
 impl Cursor {
     pub fn new() -> Result<Cursor> {
         Ok(Cursor {
-            dir: std::env::current_dir()?,
+            cwd: std::env::current_dir()?,
             paths: HashMap::new(),
-            point: 0,
-            prev_op: None,
+            selected: Cursor::first_child(std::env::current_dir()?)?,
         })
     }
 
-    pub fn pos(&self) -> i32 {
-        self.point
+    pub fn pos(&self) -> Result<i32> {
+        let siblings = self.siblings()?;
+        let pos = siblings
+            .iter()
+            .position(|p| p == &self.selected)
+            .unwrap_or(0) as i32;
+        Ok(pos)
     }
 
     pub fn current_dir(&self) -> &PathBuf {
-        &self.dir
+        &self.cwd
     }
 
     pub fn siblings(&self) -> Result<Vec<PathBuf>> {
         let mut siblings = Vec::new();
         for entry in std::fs::read_dir(".")? {
-            siblings.push(entry?.path());
+            if let Some(f) = entry?.path().file_name() {
+                siblings.push(self.cwd.join(f))
+            }
         }
         siblings.sort();
         Ok(siblings)
     }
 
-    pub fn update_dir(&mut self) -> Result<()> {
-        self.dir = std::env::current_dir()?;
-        Ok(())
-    }
-
-    pub fn update_pos(&mut self) -> Result<()> {
-        let path_pos = self.paths.get(&self.dir);
-        let prev = self.prev_op.as_ref().map(|op| op.kind == OpKind::Out);
-        let last = self.prev_op.as_ref().and_then(|op| op.path.file_name());
-        let pos = match (path_pos, prev, last) {
-            (Some(&cursor), _, _) => cursor,
-            (None, Some(true), Some(last)) => {
-                let index = self
-                    .siblings()?
-                    .iter()
-                    .position(|p| p.file_name() == Some(last))
-                    .unwrap_or(0);
-                index as i32
-            }
-            _ => 0,
-        };
-        self.point = pos;
-        Ok(())
+    fn first_child(path: PathBuf) -> Result<PathBuf> {
+        let mut children = Vec::new();
+        for entry in std::fs::read_dir(&path)? {
+            let child = entry?.path();
+            children.push(child);
+        }
+        children.sort();
+        if children.is_empty() {
+            Ok(path)
+        } else {
+            Ok(children[0].clone())
+        }
     }
 
     pub fn move_down(&mut self) -> Result<()> {
-        if self.point + 1 < self.siblings()?.len() as i32 {
-            self.point += 1;
+        let siblings = self.siblings()?;
+        let pos = self.pos()?;
+        if pos < siblings.len() as i32 - 1 {
+            self.selected = siblings[(pos + 1) as usize].clone();
         }
-        self.prev_op = None;
         Ok(())
     }
 
     pub fn move_up(&mut self) -> Result<()> {
-        if self.point > 0 {
-            self.point -= 1;
-        } else {
-            self.point = 0;
+        let siblings = self.siblings()?;
+        let pos = self.pos()?;
+        if pos > 0 {
+            self.selected = siblings[(pos - 1) as usize].clone();
         }
-        self.prev_op = None;
         Ok(())
     }
 
-    pub fn move_out_of_dir(&mut self) -> Result<()> {
-        std::env::set_current_dir("..")?;
-        let op = Some(Op::new(OpKind::Out, self.dir.clone()));
-        self.point = self.pos();
-        self.prev_op = op;
+    pub fn move_in(&mut self) -> Result<()> {
+        if self.selected.is_dir() {
+            self.paths.insert(self.cwd.clone(), self.selected.clone());
+            self.cwd = self
+                .cwd
+                .clone()
+                .join(self.selected.file_name().unwrap_or(OsStr::new("")));
+            self.selected = self
+                .paths
+                .get(&self.cwd)
+                .unwrap_or(&Cursor::first_child(self.cwd.clone())?)
+                .clone();
+        }
+        std::env::set_current_dir(&self.cwd)?;
         Ok(())
     }
 
-    pub fn move_into_dir(&mut self) -> Result<()> {
-        if !self.siblings()?.is_empty() {
-            let path = &self.siblings()?[(self.pos()) as usize];
-            let file = path.file_name().unwrap_or(OsStr::new(""));
-            let newdir = self.dir.join(file);
-            if newdir.is_dir() {
-                std::env::set_current_dir(newdir)?;
+    pub fn move_out(&mut self) -> Result<()> {
+        self.paths.insert(self.cwd.clone(), self.selected.clone());
+        let child_cwd = self.cwd.clone();
+        if self.cwd.parent().is_some() {
+            self.cwd = self.cwd.parent().unwrap_or(&child_cwd).to_path_buf();
+            self.selected = match self.paths.get(&self.cwd) {
+                Some(v) => v.clone(),
+                None => child_cwd,
             }
         }
-        self.point = self.pos();
-        self.prev_op = None;
-        Ok(())
-    }
-
-    pub fn before(&mut self) -> Result<()> {
-        self.update_dir()?;
-        self.update_pos()?;
-        Ok(())
-    }
-
-    pub fn after(&mut self) -> Result<()> {
-        self.paths.insert(self.dir.clone(), self.pos());
+        std::env::set_current_dir(&self.cwd)?;
         Ok(())
     }
 }

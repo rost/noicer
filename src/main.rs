@@ -34,7 +34,6 @@ struct Cursor {
     paths: HashMap<PathBuf, i32>,
     point: i32,
     prev_op: Option<Op>,
-    siblings: Vec<PathBuf>,
 }
 
 impl Cursor {
@@ -44,7 +43,6 @@ impl Cursor {
             paths: HashMap::new(),
             point: 0,
             prev_op: None,
-            siblings: Vec::new(),
         })
     }
 
@@ -52,18 +50,17 @@ impl Cursor {
         self.point
     }
 
-    fn update_dir(&mut self) -> Result<()> {
-        self.dir = std::env::current_dir()?;
-        Ok(())
+    fn siblings(&self) -> Result<Vec<PathBuf>> {
+        let mut siblings = Vec::new();
+        for entry in std::fs::read_dir(".")? {
+            siblings.push(entry?.path());
+        }
+        siblings.sort();
+        Ok(siblings)
     }
 
-    fn update_dir_content(&mut self) -> Result<()> {
-        let mut entries = Vec::new();
-        for entry in std::fs::read_dir(".")? {
-            entries.push(entry?.path());
-        }
-        entries.sort();
-        self.siblings = entries;
+    fn update_dir(&mut self) -> Result<()> {
+        self.dir = std::env::current_dir()?;
         Ok(())
     }
 
@@ -75,7 +72,7 @@ impl Cursor {
             (Some(&cursor), _, _) => cursor,
             (None, Some(true), Some(last)) => {
                 let index = self
-                    .siblings
+                    .siblings()?
                     .iter()
                     .position(|p| p.file_name() == Some(last))
                     .unwrap_or(0);
@@ -88,7 +85,7 @@ impl Cursor {
     }
 
     fn move_down(&mut self) -> Result<()> {
-        if self.point + 1 < self.siblings.len() as i32 {
+        if self.point + 1 < self.siblings()?.len() as i32 {
             self.point += 1;
         }
         self.prev_op = None;
@@ -114,8 +111,8 @@ impl Cursor {
     }
 
     fn move_into_dir(&mut self) -> Result<()> {
-        if !self.siblings.is_empty() {
-            let path = &self.siblings[(self.pos()) as usize];
+        if !self.siblings()?.is_empty() {
+            let path = &self.siblings()?[(self.pos()) as usize];
             let file = path.file_name().unwrap_or(OsStr::new(""));
             let newdir = self.dir.join(file);
             if newdir.is_dir() {
@@ -129,7 +126,6 @@ impl Cursor {
 
     fn before(&mut self) -> Result<()> {
         self.update_dir()?;
-        self.update_dir_content()?;
         self.update_pos()?;
         Ok(())
     }
@@ -194,10 +190,10 @@ where
 
 fn format_lines(cursor: &Cursor) -> Result<Vec<String>> {
     let empty_dir = vec![PathBuf::from("   ../")];
-    let content = if !cursor.siblings.is_empty() {
-        &cursor.siblings
+    let content = if !cursor.siblings()?.is_empty() {
+        cursor.siblings()?
     } else {
-        &empty_dir
+        empty_dir
     };
 
     let mut lines = Vec::new();
@@ -205,7 +201,7 @@ fn format_lines(cursor: &Cursor) -> Result<Vec<String>> {
     lines.push(String::from(""));
 
     for entry in content {
-        lines.push(format_pathbuf(entry)?);
+        lines.push(format_pathbuf(&entry)?);
     }
 
     let index = (cursor.pos() + 2) as usize;

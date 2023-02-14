@@ -9,12 +9,19 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    pub fn new() -> Result<Cursor> {
-        Ok(Cursor {
-            cwd: std::env::current_dir()?,
+    pub fn new(cwd: PathBuf) -> Cursor {
+        Cursor {
+            cwd,
             paths: HashMap::new(),
-            selected: Cursor::first_child(std::env::current_dir()?)?,
-        })
+            selected: PathBuf::new(),
+        }
+    }
+
+    pub fn init(&mut self) -> Result<()> {
+        self.cwd = std::env::current_dir()?;
+        self.paths = HashMap::new();
+        self.selected = self.first_child()?;
+        Ok(())
     }
 
     pub fn pos(&self) -> Result<i32> {
@@ -41,15 +48,15 @@ impl Cursor {
         Ok(siblings)
     }
 
-    fn first_child(path: PathBuf) -> Result<PathBuf> {
+    fn first_child(&self) -> Result<PathBuf> {
         let mut children = Vec::new();
-        for entry in std::fs::read_dir(&path)? {
+        for entry in std::fs::read_dir(&self.cwd)? {
             let child = entry?.path();
             children.push(child);
         }
         children.sort();
         if children.is_empty() {
-            Ok(path)
+            Ok(self.cwd.clone())
         } else {
             Ok(children[0].clone())
         }
@@ -83,7 +90,7 @@ impl Cursor {
             self.selected = self
                 .paths
                 .get(&self.cwd)
-                .unwrap_or(&Cursor::first_child(self.cwd.clone())?)
+                .unwrap_or(&self.first_child()?)
                 .clone();
         }
         std::env::set_current_dir(&self.cwd)?;

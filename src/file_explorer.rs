@@ -21,7 +21,8 @@ where
 
     terminal::enable_raw_mode()?;
 
-    let mut cursor = Cursor::new()?;
+    let mut cursor = Cursor::new(std::env::current_dir()?);
+    cursor.init()?;
 
     loop {
         queue!(

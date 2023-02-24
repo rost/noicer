@@ -21,7 +21,7 @@ where
 
     terminal::enable_raw_mode()?;
 
-    let mut cursor = Cursor::new(std::env::current_dir()?);
+    let mut cursor = Cursor::new();
     cursor.init()?;
 
     loop {
@@ -58,8 +58,8 @@ where
 
 fn format_lines(cursor: &Cursor) -> Result<Vec<String>> {
     let empty_dir = vec![PathBuf::from("   ../")];
-    let content = if !cursor.siblings()?.is_empty() {
-        cursor.siblings()?
+    let content = if !cursor.current_siblings()?.is_empty() {
+        cursor.current_siblings()?
     } else {
         empty_dir
     };

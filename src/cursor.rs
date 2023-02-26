@@ -1,8 +1,13 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
 
 use crossterm::Result;
 
 pub struct Cursor {
+    hide: bool,
     paths: HashMap<PathBuf, PathBuf>,
     selected: PathBuf,
 }
@@ -10,6 +15,7 @@ pub struct Cursor {
 impl Cursor {
     pub fn new() -> Cursor {
         Cursor {
+            hide: true,
             paths: HashMap::new(),
             selected: PathBuf::new(),
         }
@@ -74,6 +80,11 @@ impl Cursor {
         Ok(())
     }
 
+    pub fn toggle_hidden_files(&mut self) -> Result<()> {
+        self.hide = !self.hide;
+        Ok(())
+    }
+
     pub fn selected(&self) -> PathBuf {
         self.selected.clone()
     }
@@ -96,10 +107,23 @@ impl Cursor {
     pub fn siblings(&self, path: PathBuf) -> Result<Vec<PathBuf>> {
         let mut siblings = Vec::new();
         for entry in std::fs::read_dir(path)? {
-            siblings.push(entry?.path());
+            let path = &entry?.path();
+            if self.hide && self.hidden(path) {
+                continue;
+            } else {
+                siblings.push(path.clone())
+            }
         }
         siblings.sort();
         Ok(siblings)
+    }
+
+    fn hidden(&self, path: &Path) -> bool {
+        path.file_name()
+            .unwrap_or(OsStr::new(""))
+            .to_str()
+            .unwrap_or("")
+            .starts_with('.')
     }
 
     pub fn pos(&self) -> Result<i32> {

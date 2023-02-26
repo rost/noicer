@@ -110,6 +110,7 @@ fn handle_keypress(char: &char, arrow: &mut Cursor) -> Result<()> {
         'k' => arrow.move_up()?,
         'h' => arrow.move_out()?,
         'l' => arrow.move_in()?,
+        '.' => arrow.toggle_hidden_files()?,
         _ => (),
     };
     Ok(())

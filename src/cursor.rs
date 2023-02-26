@@ -80,6 +80,18 @@ impl Cursor {
         Ok(())
     }
 
+    pub fn move_bottom(&mut self) -> Result<()> {
+        let siblings = self.siblings(self.current_dir())?;
+        self.selected = siblings[siblings.len() - 1].clone();
+        Ok(())
+    }
+
+    pub fn move_top(&mut self) -> Result<()> {
+        let siblings = self.siblings(self.current_dir())?;
+        self.selected = siblings[0].clone();
+        Ok(())
+    }
+
     pub fn toggle_hidden_files(&mut self) -> Result<()> {
         self.hide = !self.hide;
         Ok(())

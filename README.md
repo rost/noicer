@@ -11,7 +11,10 @@ A simple file browser for the terminal. Inspired by `noice`.
 - [x] show/hide hidden files using `.`
 - [ ] search/filter using `/`
 - [ ] add more vim keybindings
-  - [ ] `gg`, `G`, `2j`, `5k`, etc.
+  - [ ] `gg`
+  - [x] `G`
+  - [ ] `2j`
+  - [ ] `5k`
 - [ ] support for opening directories
   - [ ] set PWD for underlying shell?
   - [ ] spawn new shell?

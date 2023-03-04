@@ -33,7 +33,11 @@ where
             cursor::MoveTo(1, 1)
         )?;
 
-        let screen_lines = format_lines(&cursor)?;
+        let screen_lines = format_lines(
+            cursor.current_dir(),
+            cursor.current_siblings()?,
+            cursor.pos()?,
+        )?;
         for line in screen_lines {
             queue!(w, style::Print(line), cursor::MoveToNextLine(1))?;
         }
@@ -56,23 +60,26 @@ where
     Ok(terminal::disable_raw_mode()?)
 }
 
-fn format_lines(cursor: &Cursor) -> Result<Vec<String>> {
-    let empty_dir = vec![PathBuf::from("   ../")];
-    let content = if !cursor.current_siblings()?.is_empty() {
-        cursor.current_siblings()?
+fn format_lines(
+    current_dir: PathBuf,
+    current_siblings: Vec<PathBuf>,
+    pos: i32,
+) -> Result<Vec<String>> {
+    let content = if !current_siblings.is_empty() {
+        current_siblings
     } else {
-        empty_dir
+        vec![PathBuf::from("   ../")]
     };
 
     let mut lines = Vec::new();
-    lines.push(format!("{}", cursor.current_dir().display()));
+    lines.push(format!("{}", current_dir.display()));
     lines.push(String::from(""));
 
     for entry in content {
         lines.push(format_pathbuf(&entry)?);
     }
 
-    let index = (cursor.pos()? + 2) as usize;
+    let index = (pos + 2) as usize;
     lines[index] = format!(" > {}", lines[index].trim_start());
 
     Ok(lines)

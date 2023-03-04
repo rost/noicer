@@ -9,7 +9,8 @@ A simple file browser for the terminal. Inspired by `noice`.
 - [ ] support for opening files
   - [ ] config file with supported file types and programs to execute
 - [x] show/hide hidden files using `.`
-- [ ] search/filter using `/`
+- [x] search using `/`
+- [ ] filter using `:g/term`
 - [ ] add more vim keybindings
   - [ ] `gg`
   - [x] `G`

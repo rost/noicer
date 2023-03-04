@@ -21,6 +21,9 @@ where
 
     terminal::enable_raw_mode()?;
 
+    let mut search = false;
+    let mut search_term = String::new();
+
     let mut cursor = Cursor::new();
     cursor.init()?;
 
@@ -42,12 +45,47 @@ where
             queue!(w, style::Print(line), cursor::MoveToNextLine(1))?;
         }
 
+        if search {
+            let (_, term_height) = terminal::size()?;
+            queue!(
+                w,
+                cursor::MoveTo(0, term_height),
+                style::Print(format!("/{}", search_term))
+            )?;
+        }
+
         w.flush()?;
 
-        match read_char()? {
-            'q' => break,
-            char => handle_keypress(&char, &mut cursor)?,
-        };
+        if search {
+            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                match code {
+                    KeyCode::Char(c) => {
+                        search_term.push(c);
+                    }
+                    KeyCode::Backspace => {
+                        if search_term.is_empty() {
+                            search = toggle_search(search);
+                            continue;
+                        }
+                        search_term.pop();
+                    }
+                    KeyCode::Esc | KeyCode::Enter => {
+                        search = toggle_search(search);
+                    }
+                    _ => {}
+                }
+                if !search_term.is_empty() {
+                    cursor.search(&search_term)?
+                }
+            }
+        } else {
+            search_term = String::new();
+            match read_char()? {
+                'q' => break,
+                '/' => search = toggle_search(search),
+                char => handle_keypress(&char, &mut cursor)?,
+            };
+        }
     }
 
     execute!(
@@ -58,6 +96,10 @@ where
     )?;
 
     Ok(terminal::disable_raw_mode()?)
+}
+
+fn toggle_search(search: bool) -> bool {
+    !search
 }
 
 fn format_lines(

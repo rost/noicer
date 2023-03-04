@@ -97,6 +97,32 @@ impl Cursor {
         Ok(())
     }
 
+    pub fn search(&mut self, pattern: &str) -> Result<()> {
+        let matches = self.matching_siblings(pattern)?;
+        if !matches.is_empty() {
+            if let Some(path) = matches.first() {
+                self.selected = path.into()
+            }
+        }
+        Ok(())
+    }
+
+    fn matching_siblings(&self, pattern: &str) -> Result<Vec<PathBuf>> {
+        let siblings = self.siblings(self.current_dir())?;
+        let mut matches = Vec::new();
+        for sibling in siblings {
+            if sibling
+                .to_str()
+                .unwrap_or("")
+                .to_lowercase()
+                .contains(&pattern.to_lowercase())
+            {
+                matches.push(sibling);
+            }
+        }
+        Ok(matches)
+    }
+
     pub fn selected(&self) -> PathBuf {
         self.selected.clone()
     }

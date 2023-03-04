@@ -24,6 +24,8 @@ where
     let mut search = false;
     let mut search_term = String::new();
 
+    let mut line = String::new();
+
     let mut cursor = Cursor::new();
     cursor.init()?;
 
@@ -80,11 +82,65 @@ where
             }
         } else {
             search_term = String::new();
-            match read_char()? {
-                'q' => break,
-                '/' => search = toggle_search(search),
-                char => handle_keypress(&char, &mut cursor)?,
+            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                match code {
+                    KeyCode::Enter => {
+                        continue;
+                    }
+                    KeyCode::Char(c) => {
+                        line.push(c);
+                    }
+                    _ => {}
+                }
+            }
+
+            if let "q" = line.as_str() {
+                break;
             };
+
+            let simple_op: bool = match line.as_str() {
+                "G" => {
+                    cursor.move_bottom()?;
+                    true
+                }
+                "j" => {
+                    cursor.move_down()?;
+                    true
+                }
+                "k" => {
+                    cursor.move_up()?;
+                    true
+                }
+                "h" => {
+                    cursor.move_out()?;
+                    true
+                }
+                "l" => {
+                    cursor.move_in()?;
+                    true
+                }
+                "." => {
+                    cursor.toggle_hidden_files()?;
+                    true
+                }
+                "/" => {
+                    search = toggle_search(search);
+                    true
+                }
+                _ => false,
+            };
+
+            let complex_op: bool = match line.as_str() {
+                "gg" => {
+                    cursor.move_top()?;
+                    true
+                }
+                _ => false,
+            };
+
+            if simple_op || complex_op {
+                line = String::new();
+            }
         }
     }
 
@@ -139,30 +195,4 @@ fn format_pathbuf(path: &Path) -> Result<String> {
         _ => String::from(""),
     };
     Ok(r)
-}
-
-fn read_char() -> Result<char> {
-    loop {
-        if let Ok(Event::Key(KeyEvent {
-            code: KeyCode::Char(c),
-            ..
-        })) = event::read()
-        {
-            return Ok(c);
-        }
-    }
-}
-
-fn handle_keypress(char: &char, arrow: &mut Cursor) -> Result<()> {
-    match char {
-        'j' => arrow.move_down()?,
-        'k' => arrow.move_up()?,
-        'h' => arrow.move_out()?,
-        'l' => arrow.move_in()?,
-        'G' => arrow.move_bottom()?,
-        'g' => arrow.move_top()?,
-        '.' => arrow.toggle_hidden_files()?,
-        _ => (),
-    };
-    Ok(())
 }

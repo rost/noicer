@@ -12,7 +12,7 @@ A simple file browser for the terminal. Inspired by `noice`.
 - [x] search using `/`
 - [ ] filter using `:g/term`
 - [ ] add more vim keybindings
-  - [ ] `gg`
+  - [x] `gg`
   - [x] `G`
   - [ ] `2j`
   - [ ] `5k`

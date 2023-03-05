@@ -31,20 +31,24 @@ impl Cursor {
         Ok(())
     }
 
-    pub fn move_down(&mut self) -> Result<()> {
+    pub fn move_down(&mut self, n: i32) -> Result<()> {
         let siblings = self.siblings(self.current_dir())?;
         let pos = self.pos()?;
-        if pos < siblings.len() as i32 - 1 {
-            self.selected = siblings[(pos + 1) as usize].clone();
+        if pos < siblings.len() as i32 - n {
+            self.selected = siblings[(pos + n) as usize].clone();
+        } else {
+            self.selected = siblings.last().unwrap_or(&self.selected).clone()
         }
         Ok(())
     }
 
-    pub fn move_up(&mut self) -> Result<()> {
+    pub fn move_up(&mut self, n: i32) -> Result<()> {
         let siblings = self.siblings(self.current_dir())?;
         let pos = self.pos()?;
-        if pos > 0 {
-            self.selected = siblings[(pos - 1) as usize].clone();
+        if pos >= n {
+            self.selected = siblings[(pos - n) as usize].clone();
+        } else {
+            self.selected = siblings.first().unwrap_or(&self.selected).clone()
         }
         Ok(())
     }

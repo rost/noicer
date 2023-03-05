@@ -104,11 +104,11 @@ where
                     true
                 }
                 "j" => {
-                    cursor.move_down()?;
+                    cursor.move_down(1)?;
                     true
                 }
                 "k" => {
-                    cursor.move_up()?;
+                    cursor.move_up(1)?;
                     true
                 }
                 "h" => {
@@ -130,13 +130,31 @@ where
                 _ => false,
             };
 
-            let complex_op: bool = match line.as_str() {
-                "gg" => {
-                    cursor.move_top()?;
-                    true
-                }
-                _ => false,
-            };
+            let mut complex_op: bool = false;
+            if line.len() > 1 {
+                complex_op = match line.as_str() {
+                    "gg" => {
+                        cursor.move_top()?;
+                        true
+                    }
+                    cmd => {
+                        let (arg, op) = cmd.split_at(1);
+                        let arg = arg.parse::<i32>().unwrap_or(1);
+                        match op {
+                            "j" => {
+                                cursor.move_down(arg)?;
+                                true
+                            }
+                            "k" => {
+                                cursor.move_up(arg)?;
+                                true
+                            }
+                            _ => false,
+                        };
+                        true
+                    }
+                };
+            }
 
             if simple_op || complex_op {
                 line = String::new();

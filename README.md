@@ -14,8 +14,8 @@ A simple file browser for the terminal. Inspired by `noice`.
 - [ ] add more vim keybindings
   - [x] `gg`
   - [x] `G`
-  - [ ] `2j`
-  - [ ] `5k`
+  - [x] `2j`
+  - [x] `5k`
 - [ ] support for opening directories
   - [ ] set PWD for underlying shell?
   - [ ] spawn new shell?

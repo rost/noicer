@@ -94,70 +94,38 @@ where
                 }
             }
 
-            if let "q" = line.as_str() {
-                break;
-            };
-
-            let simple_op: bool = match line.as_str() {
-                "G" => {
-                    cursor.move_bottom()?;
-                    true
-                }
-                "j" => {
-                    cursor.move_down(1)?;
-                    true
-                }
-                "k" => {
-                    cursor.move_up(1)?;
-                    true
-                }
-                "h" => {
-                    cursor.move_out()?;
-                    true
-                }
-                "l" => {
-                    cursor.move_in()?;
-                    true
-                }
-                "." => {
-                    cursor.toggle_hidden_files()?;
-                    true
-                }
-                "/" => {
-                    search = toggle_search(search);
-                    true
-                }
-                _ => false,
-            };
-
-            let mut complex_op: bool = false;
-            if line.len() > 1 {
-                complex_op = match line.as_str() {
-                    "gg" => {
-                        cursor.move_top()?;
-                        true
-                    }
-                    cmd => {
-                        let (arg, op) = cmd.split_at(1);
-                        let arg = arg.parse::<i32>().unwrap_or(1);
-                        match op {
-                            "j" => {
-                                cursor.move_down(arg)?;
-                                true
-                            }
-                            "k" => {
-                                cursor.move_up(arg)?;
-                                true
-                            }
-                            _ => false,
-                        };
-                        true
-                    }
-                };
+            let mut simple_op = parse_line(line.as_str());
+            match &simple_op {
+                Some(o) => match &o.optype {
+                    OpType::Opq => break,
+                    OpType::OpG => cursor.move_bottom()?,
+                    OpType::Opj => cursor.move_down(1)?,
+                    OpType::Opk => cursor.move_up(1)?,
+                    OpType::Oph => cursor.move_out()?,
+                    OpType::Opl => cursor.move_in()?,
+                    OpType::Opdot => cursor.toggle_hidden_files()?,
+                    OpType::Opslash => search = toggle_search(search),
+                    _ => simple_op = None,
+                },
+                None => simple_op = None,
             }
 
-            if simple_op || complex_op {
-                line = String::new();
+            let mut complex_op = None;
+            if line.len() > 1 {
+                complex_op = parse_line(line.as_str());
+                match &complex_op {
+                    Some(o) => match &o.optype {
+                        OpType::Opgg => cursor.move_top()?,
+                        OpType::Opnj => cursor.move_down(o.arg.parse::<i32>()?)?,
+                        OpType::Opnk => cursor.move_up(o.arg.parse::<i32>()?)?,
+                        _ => complex_op = None,
+                    },
+                    None => complex_op = None,
+                }
+            }
+
+            if simple_op.is_some() || complex_op.is_some() || line.len() > 2 {
+                line = String::new()
             }
         }
     }
@@ -213,4 +181,80 @@ fn format_pathbuf(path: &Path) -> Result<String> {
         _ => String::from(""),
     };
     Ok(r)
+}
+
+fn parse_line(line: &str) -> Option<Op> {
+    let (arg, op) = line.split_at(line.len() - 1);
+    let op = Op::new(String::from(op), String::from(arg));
+    Some(op)
+}
+
+struct Op {
+    optype: OpType,
+    arg: String,
+}
+
+impl Op {
+    fn new(op: String, arg: String) -> Self {
+        Self {
+            optype: parse_op(&op, &arg),
+            arg,
+        }
+    }
+}
+
+fn parse_op(op: &str, arg: &str) -> OpType {
+    match op {
+        "q" => OpType::Opq,
+        "G" => OpType::OpG,
+        "g" => {
+            if arg == "g" {
+                OpType::Opgg
+            } else {
+                OpType::None
+            }
+        }
+        "j" => match arg {
+            "" => OpType::Opj,
+            _ => {
+                let n = arg.parse::<i32>().unwrap_or(-1);
+                if n >= 0 {
+                    OpType::Opnj
+                } else {
+                    OpType::None
+                }
+            }
+        },
+        "k" => match arg {
+            "" => OpType::Opk,
+            _ => {
+                let n = arg.parse::<i32>().unwrap_or(-1);
+                if n >= 0 {
+                    OpType::Opnk
+                } else {
+                    OpType::None
+                }
+            }
+        },
+        "h" => OpType::Oph,
+        "l" => OpType::Opl,
+        "." => OpType::Opdot,
+        "/" => OpType::Opslash,
+        _ => OpType::None,
+    }
+}
+
+enum OpType {
+    Opq,
+    OpG,
+    Opgg,
+    Opnj,
+    Opj,
+    Opnk,
+    Opk,
+    Oph,
+    Opl,
+    Opdot,
+    Opslash,
+    None,
 }

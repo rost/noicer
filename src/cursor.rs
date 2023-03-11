@@ -2,20 +2,30 @@ use std::{
     collections::HashMap,
     ffi::OsStr,
     path::{Path, PathBuf},
+    time::UNIX_EPOCH,
 };
 
 use crossterm::Result;
 
 pub struct Cursor {
     hide: bool,
+    sort: Sort,
     paths: HashMap<PathBuf, PathBuf>,
     selected: PathBuf,
+}
+
+pub enum Sort {
+    Dir,
+    Name,
+    Size,
+    Time,
 }
 
 impl Cursor {
     pub fn new() -> Cursor {
         Cursor {
             hide: true,
+            sort: Sort::Name,
             paths: HashMap::new(),
             selected: PathBuf::new(),
         }
@@ -101,6 +111,26 @@ impl Cursor {
         Ok(())
     }
 
+    pub fn sort_dir(&mut self) -> Result<()> {
+        self.sort = Sort::Dir;
+        Ok(())
+    }
+
+    pub fn sort_name(&mut self) -> Result<()> {
+        self.sort = Sort::Name;
+        Ok(())
+    }
+
+    pub fn sort_size(&mut self) -> Result<()> {
+        self.sort = Sort::Size;
+        Ok(())
+    }
+
+    pub fn sort_time(&mut self) -> Result<()> {
+        self.sort = Sort::Time;
+        Ok(())
+    }
+
     pub fn search(&mut self, pattern: &str) -> Result<()> {
         let matches = self.matching_siblings(pattern)?;
         if !matches.is_empty() {
@@ -156,7 +186,12 @@ impl Cursor {
                 siblings.push(path.clone())
             }
         }
-        siblings.sort();
+        match self.sort {
+            Sort::Dir => self.sort_by_dir(&mut siblings),
+            Sort::Name => self.sort_by_name(&mut siblings),
+            Sort::Size => self.sort_by_size(&mut siblings),
+            Sort::Time => self.sort_by_time(&mut siblings),
+        }
         Ok(siblings)
     }
 
@@ -166,6 +201,34 @@ impl Cursor {
             .to_str()
             .unwrap_or("")
             .starts_with('.')
+    }
+
+    fn sort_by_dir(&self, siblings: &mut [PathBuf]) {
+        siblings.sort_by_key(|b| std::cmp::Reverse(b.is_dir()));
+    }
+
+    fn sort_by_name(&self, siblings: &mut [PathBuf]) {
+        siblings.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    }
+
+    fn sort_by_time(&self, siblings: &mut [PathBuf]) {
+        siblings.sort_by(|a, b| {
+            let a_mtime = a
+                .metadata()
+                .map_or(UNIX_EPOCH, |m| m.modified().unwrap_or(UNIX_EPOCH));
+            let b_mtime = b
+                .metadata()
+                .map_or(UNIX_EPOCH, |m| m.modified().unwrap_or(UNIX_EPOCH));
+            a_mtime.cmp(&b_mtime)
+        });
+    }
+
+    fn sort_by_size(&self, siblings: &mut [PathBuf]) {
+        siblings.sort_by(|a, b| {
+            let a_len = a.metadata().map(|m| m.len()).unwrap_or(0);
+            let b_len = b.metadata().map(|m| m.len()).unwrap_or(0);
+            a_len.cmp(&b_len)
+        });
     }
 
     pub fn pos(&self) -> Result<i32> {

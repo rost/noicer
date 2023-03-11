@@ -112,6 +112,7 @@ where
                         }
                     }
                     OpType::Opdot => cursor.toggle_hidden_files()?,
+                    OpType::Opcasing => cursor.toggle_case_sensitivity()?,
                     OpType::Opsortdir => cursor.sort_dir()?,
                     OpType::Opsortname => cursor.sort_name()?,
                     OpType::Opsortsize => cursor.sort_size()?,
@@ -271,6 +272,7 @@ fn parse_op(op: &str, arg: &str) -> OpType {
         "h" => OpType::Oph,
         "l" => OpType::Opl,
         "." => OpType::Opdot,
+        "i" => OpType::Opcasing,
         "d" => OpType::Opsortdir,
         "n" => OpType::Opsortname,
         "s" => OpType::Opsortsize,
@@ -294,6 +296,7 @@ enum OpType {
     Oph,
     Opl,
     Opdot,
+    Opcasing,
     Opsortdir,
     Opsortname,
     Opsortsize,

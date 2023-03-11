@@ -13,6 +13,7 @@ A simple file browser for the terminal. Inspired by `noice`.
   - [ ] config file with supported file types and programs to execute
 - [x] show/hide hidden files using `.`
 - [x] sort by dir, name, size, time using `d`, `n`, `s`, `t`
+- [x] case sensitive sorting using `i`
 - [x] search using `/`
 - [ ] filter using `:g/term`
 - [ ] add more vim keybindings

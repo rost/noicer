@@ -9,6 +9,7 @@ use crossterm::Result;
 
 pub struct Cursor {
     hide: bool,
+    casing: bool,
     sort: Sort,
     paths: HashMap<PathBuf, PathBuf>,
     selected: PathBuf,
@@ -25,6 +26,7 @@ impl Cursor {
     pub fn new() -> Cursor {
         Cursor {
             hide: true,
+            casing: false,
             sort: Sort::Name,
             paths: HashMap::new(),
             selected: PathBuf::new(),
@@ -111,6 +113,11 @@ impl Cursor {
         Ok(())
     }
 
+    pub fn toggle_case_sensitivity(&mut self) -> Result<()> {
+        self.casing = !self.casing;
+        Ok(())
+    }
+
     pub fn sort_dir(&mut self) -> Result<()> {
         self.sort = Sort::Dir;
         Ok(())
@@ -192,6 +199,10 @@ impl Cursor {
             Sort::Size => self.sort_by_size(&mut siblings),
             Sort::Time => self.sort_by_time(&mut siblings),
         }
+        match self.casing {
+            true => self.sort_by_casing(&mut siblings),
+            false => (),
+        }
         Ok(siblings)
     }
 
@@ -201,6 +212,17 @@ impl Cursor {
             .to_str()
             .unwrap_or("")
             .starts_with('.')
+    }
+
+    fn sort_by_casing(&self, siblings: &mut [PathBuf]) {
+        if self.casing {
+            siblings.sort_by(|a, b| {
+                a.to_str()
+                    .unwrap_or("")
+                    .to_lowercase()
+                    .cmp(&b.to_str().unwrap_or("").to_lowercase())
+            });
+        }
     }
 
     fn sort_by_dir(&self, siblings: &mut [PathBuf]) {

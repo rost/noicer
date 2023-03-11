@@ -108,11 +108,14 @@ where
                         if cursor.selected().is_dir() {
                             cursor.move_in()?
                         } else {
-                            run_pager(&cursor.selected())?
+                            run_prog("bat", &cursor.selected())?
                         }
                     }
                     OpType::Opdot => cursor.toggle_hidden_files()?,
                     OpType::Opslash => search = toggle_search(search),
+                    OpType::Oppage => run_prog("bat", &cursor.selected())?,
+                    OpType::Opedit => run_prog("vi", &cursor.selected())?,
+                    OpType::Opbang => run_prog("fish", &cursor.current_dir())?,
                     _ => simple_op = None,
                 },
                 None => simple_op = None,
@@ -152,11 +155,19 @@ fn toggle_search(search: bool) -> bool {
     !search
 }
 
-fn run_pager(path: &Path) -> anyhow::Result<()> {
-    let mut out = Command::new("bat")
-        .arg(path)
-        .spawn()
-        .expect("pager command failed to start");
+fn run_prog(prog: &str, path: &Path) -> anyhow::Result<()> {
+    let mut out = match path.is_dir() {
+        true => {
+            std::env::set_current_dir(path)?;
+            Command::new(prog)
+                .spawn()
+                .expect("pager command failed to start")
+        }
+        false => Command::new(prog)
+            .arg(path)
+            .spawn()
+            .expect("pager command failed to start"),
+    };
     out.wait().expect("failed while waiting");
     Ok(())
 }
@@ -257,6 +268,9 @@ fn parse_op(op: &str, arg: &str) -> OpType {
         "l" => OpType::Opl,
         "." => OpType::Opdot,
         "/" => OpType::Opslash,
+        "p" => OpType::Oppage,
+        "e" => OpType::Opedit,
+        "!" => OpType::Opbang,
         _ => OpType::None,
     }
 }
@@ -273,5 +287,8 @@ enum OpType {
     Opl,
     Opdot,
     Opslash,
+    Oppage,
+    Opedit,
+    Opbang,
     None,
 }

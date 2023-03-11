@@ -9,6 +9,7 @@ A simple file browser for the terminal. Inspired by `noice`.
 - [ ] support for opening files
   - [x] pager support for text files (default behaviour for files)
     - defaults to bat using `--paging=always` in config to enable paging
+  - [x] editor support for text files
   - [ ] config file with supported file types and programs to execute
 - [x] show/hide hidden files using `.`
 - [x] search using `/`
@@ -18,8 +19,8 @@ A simple file browser for the terminal. Inspired by `noice`.
   - [x] `G`
   - [x] `2j`
   - [x] `5k`
-- [ ] support for opening directories
-  - [ ] set PWD for underlying shell?
-  - [ ] spawn new shell?
+- [x] support for opening directories
+  - [ ] ~~set PWD for underlying shell?~~
+  - [x] spawn new shell?
 - [ ] support seamlessly opening archive files
   - [ ] `tar`, `gz`, `zip`, etc.

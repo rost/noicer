@@ -7,6 +7,8 @@ A simple file browser for the terminal. Inspired by `noice`.
   - [x] when moving up the tree, move cursor to the directory we came from
 - [x] graceful handling of empty directories
 - [ ] support for opening files
+  - [x] pager support for text files (default behaviour for files)
+    - defaults to bat using `--paging=always` in config to enable paging
   - [ ] config file with supported file types and programs to execute
 - [x] show/hide hidden files using `.`
 - [x] search using `/`

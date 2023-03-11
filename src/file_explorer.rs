@@ -3,6 +3,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use std::process::Command;
+
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent},
@@ -102,7 +104,13 @@ where
                     OpType::Opj => cursor.move_down(1)?,
                     OpType::Opk => cursor.move_up(1)?,
                     OpType::Oph => cursor.move_out()?,
-                    OpType::Opl => cursor.move_in()?,
+                    OpType::Opl => {
+                        if cursor.selected().is_dir() {
+                            cursor.move_in()?
+                        } else {
+                            run_pager(&cursor.selected())?
+                        }
+                    }
                     OpType::Opdot => cursor.toggle_hidden_files()?,
                     OpType::Opslash => search = toggle_search(search),
                     _ => simple_op = None,
@@ -142,6 +150,15 @@ where
 
 fn toggle_search(search: bool) -> bool {
     !search
+}
+
+fn run_pager(path: &Path) -> anyhow::Result<()> {
+    let mut out = Command::new("bat")
+        .arg(path)
+        .spawn()
+        .expect("pager command failed to start");
+    out.wait().expect("failed while waiting");
+    Ok(())
 }
 
 fn format_lines(

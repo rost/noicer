@@ -15,6 +15,28 @@ use crossterm::{
 
 use crate::cursor::Cursor;
 
+struct State {
+    cursor: Cursor,
+    line: String,
+    search: bool,
+    search_term: String,
+}
+
+impl State {
+    fn new() -> State {
+        State {
+            cursor: Cursor::new(),
+            line: String::new(),
+            search: false,
+            search_term: String::new(),
+        }
+    }
+
+    fn toggle_search(&mut self) {
+        self.search = !self.search;
+    }
+}
+
 pub fn run<W>(w: &mut W) -> anyhow::Result<()>
 where
     W: Write,
@@ -23,13 +45,9 @@ where
 
     terminal::enable_raw_mode()?;
 
-    let mut search = false;
-    let mut search_term = String::new();
+    let mut state = State::new();
 
-    let mut line = String::new();
-
-    let mut cursor = Cursor::new();
-    cursor.init()?;
+    state.cursor.init()?;
 
     loop {
         queue!(
@@ -41,107 +59,29 @@ where
         )?;
 
         let screen_lines = format_lines(
-            cursor.current_dir(),
-            cursor.current_siblings()?,
-            cursor.pos()?,
+            state.cursor.current_dir(),
+            state.cursor.current_siblings()?,
+            state.cursor.pos()?,
         )?;
         for line in screen_lines {
-            queue!(w, style::Print(line), cursor::MoveToNextLine(1))?;
+            queue!(w, style::Print(&line), cursor::MoveToNextLine(1))?;
         }
 
-        if search {
+        if state.search {
             let (_, term_height) = terminal::size()?;
             queue!(
                 w,
                 cursor::MoveTo(0, term_height),
-                style::Print(format!("/{}", search_term))
+                style::Print(format!("/{}", &state.search_term))
             )?;
         }
 
         w.flush()?;
 
-        if search {
-            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-                match code {
-                    KeyCode::Char(c) => {
-                        search_term.push(c);
-                    }
-                    KeyCode::Backspace => {
-                        if search_term.is_empty() {
-                            search = toggle_search(search);
-                            continue;
-                        }
-                        search_term.pop();
-                    }
-                    KeyCode::Esc | KeyCode::Enter => {
-                        search = toggle_search(search);
-                    }
-                    _ => {}
-                }
-                if !search_term.is_empty() {
-                    cursor.search(&search_term)?
-                }
-            }
-        } else {
-            search_term = String::new();
-            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-                match code {
-                    KeyCode::Enter => {
-                        continue;
-                    }
-                    KeyCode::Char(c) => {
-                        line.push(c);
-                    }
-                    _ => {}
-                }
-            }
-
-            let mut simple_op = parse_line(line.as_str());
-            match &simple_op {
-                Some(o) => match &o.optype {
-                    OpType::Opq => break,
-                    OpType::OpG => cursor.move_bottom()?,
-                    OpType::Opj => cursor.move_down(1)?,
-                    OpType::Opk => cursor.move_up(1)?,
-                    OpType::Oph => cursor.move_out()?,
-                    OpType::Opl => {
-                        if cursor.selected().is_dir() {
-                            cursor.move_in()?
-                        } else {
-                            run_prog("bat", &cursor.selected())?
-                        }
-                    }
-                    OpType::Opdot => cursor.toggle_hidden_files()?,
-                    OpType::Opcasing => cursor.toggle_case_sensitivity()?,
-                    OpType::Opsortdir => cursor.sort_dir()?,
-                    OpType::Opsortname => cursor.sort_name()?,
-                    OpType::Opsortsize => cursor.sort_size()?,
-                    OpType::Opsorttime => cursor.sort_time()?,
-                    OpType::Opslash => search = toggle_search(search),
-                    OpType::Oppage => run_prog("bat", &cursor.selected())?,
-                    OpType::Opedit => run_prog("vi", &cursor.selected())?,
-                    OpType::Opbang => run_prog("fish", &cursor.current_dir())?,
-                    _ => simple_op = None,
-                },
-                None => simple_op = None,
-            }
-
-            let mut complex_op = None;
-            if line.len() > 1 {
-                complex_op = parse_line(line.as_str());
-                match &complex_op {
-                    Some(o) => match &o.optype {
-                        OpType::Opgg => cursor.move_top()?,
-                        OpType::Opnj => cursor.move_down(o.arg.parse::<i32>()?)?,
-                        OpType::Opnk => cursor.move_up(o.arg.parse::<i32>()?)?,
-                        _ => complex_op = None,
-                    },
-                    None => complex_op = None,
-                }
-            }
-
-            if simple_op.is_some() || complex_op.is_some() || line.len() > 2 {
-                line = String::new()
+        match handle_keypress(&mut state) {
+            Ok(_) => (),
+            Err(_) => {
+                break;
             }
         }
     }
@@ -156,8 +96,93 @@ where
     Ok(terminal::disable_raw_mode()?)
 }
 
-fn toggle_search(search: bool) -> bool {
-    !search
+fn handle_keypress(state: &mut State) -> anyhow::Result<()> {
+    if state.search {
+        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            match code {
+                KeyCode::Char(c) => {
+                    state.search_term.push(c);
+                }
+                KeyCode::Backspace => {
+                    if state.search_term.is_empty() {
+                        state.toggle_search();
+                        return Ok(());
+                    }
+                    state.search_term.pop();
+                }
+                KeyCode::Esc | KeyCode::Enter => {
+                    state.toggle_search();
+                }
+                _ => {}
+            }
+            if !state.search_term.is_empty() {
+                state.cursor.search(&state.search_term)?;
+            }
+        }
+        Ok(())
+    } else {
+        state.search_term = String::new();
+        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            match code {
+                KeyCode::Enter => {
+                    return Ok(());
+                }
+                KeyCode::Char(c) => {
+                    state.line.push(c);
+                }
+                _ => {}
+            }
+        }
+
+        let mut simple_op = parse_line(state.line.as_str());
+        match &simple_op {
+            Some(o) => match &o.optype {
+                OpType::Opq => std::process::exit(0),
+                OpType::OpG => state.cursor.move_bottom()?,
+                OpType::Opj => state.cursor.move_down(1)?,
+                OpType::Opk => state.cursor.move_up(1)?,
+                OpType::Oph => state.cursor.move_out()?,
+                OpType::Opl => {
+                    if state.cursor.selected().is_dir() {
+                        state.cursor.move_in()?
+                    } else {
+                        run_prog("bat", &state.cursor.selected())?
+                    }
+                }
+                OpType::Opdot => state.cursor.toggle_hidden_files()?,
+                OpType::Opcasing => state.cursor.toggle_case_sensitivity()?,
+                OpType::Opsortdir => state.cursor.sort_dir()?,
+                OpType::Opsortname => state.cursor.sort_name()?,
+                OpType::Opsortsize => state.cursor.sort_size()?,
+                OpType::Opsorttime => state.cursor.sort_time()?,
+                OpType::Opslash => state.toggle_search(),
+                OpType::Oppage => run_prog("bat", &state.cursor.selected())?,
+                OpType::Opedit => run_prog("vi", &state.cursor.selected())?,
+                OpType::Opbang => run_prog("fish", &state.cursor.current_dir())?,
+                _ => simple_op = None,
+            },
+            None => simple_op = None,
+        }
+
+        let mut complex_op = None;
+        if state.line.len() > 1 {
+            complex_op = parse_line(state.line.as_str());
+            match &complex_op {
+                Some(o) => match &o.optype {
+                    OpType::Opgg => state.cursor.move_top()?,
+                    OpType::Opnj => state.cursor.move_down(o.arg.parse::<i32>()?)?,
+                    OpType::Opnk => state.cursor.move_up(o.arg.parse::<i32>()?)?,
+                    _ => complex_op = None,
+                },
+                None => complex_op = None,
+            }
+        }
+
+        if simple_op.is_some() || complex_op.is_some() || state.line.len() > 2 {
+            state.line = String::new();
+        }
+        Ok(())
+    }
 }
 
 fn run_prog(prog: &str, path: &Path) -> anyhow::Result<()> {

@@ -97,42 +97,50 @@ where
 }
 
 fn handle_keypress(state: &mut State) -> anyhow::Result<()> {
-    if state.search {
-        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-            match code {
-                KeyCode::Char(c) => {
+    if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+        match code {
+            KeyCode::Char(c) => {
+                if state.search {
                     state.search_term.push(c);
+                } else {
+                    state.line.push(c);
                 }
-                KeyCode::Backspace => {
+            }
+            KeyCode::Backspace => {
+                if state.search {
                     if state.search_term.is_empty() {
                         state.toggle_search();
                         return Ok(());
                     }
                     state.search_term.pop();
                 }
-                KeyCode::Esc | KeyCode::Enter => {
+            }
+            KeyCode::Esc => {
+                if state.search {
                     state.toggle_search();
                 }
-                _ => {}
             }
-            if !state.search_term.is_empty() {
-                state.cursor.search(&state.search_term)?;
-            }
-        }
-        Ok(())
-    } else {
-        state.search_term = String::new();
-        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-            match code {
-                KeyCode::Enter => {
+            KeyCode::Enter => {
+                if state.search {
+                    state.toggle_search();
+                } else {
                     return Ok(());
                 }
-                KeyCode::Char(c) => {
-                    state.line.push(c);
-                }
-                _ => {}
             }
+            _ => {}
         }
+
+        if state.search && !state.search_term.is_empty() {
+            state.cursor.search(&state.search_term)?;
+        }
+
+        if state.search {
+            return Ok(());
+        }
+    }
+
+    if !state.search {
+        state.search_term = String::new();
 
         let mut simple_op = parse_line(state.line.as_str());
         match &simple_op {
@@ -181,8 +189,8 @@ fn handle_keypress(state: &mut State) -> anyhow::Result<()> {
         if simple_op.is_some() || complex_op.is_some() || state.line.len() > 2 {
             state.line = String::new();
         }
-        Ok(())
     }
+    Ok(())
 }
 
 fn run_prog(prog: &str, path: &Path) -> anyhow::Result<()> {
@@ -242,6 +250,9 @@ fn format_pathbuf(path: &Path) -> Result<String> {
 }
 
 fn parse_line(line: &str) -> Option<Op> {
+    if line.is_empty() {
+        return None;
+    }
     let (arg, op) = line.split_at(line.len() - 1);
     let op = Op::new(String::from(op), String::from(arg));
     Some(op)

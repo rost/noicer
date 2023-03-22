@@ -1,4 +1,4 @@
-# nuice
+# noicer
 
 A simple file browser for the terminal. Inspired by `noice`.
 

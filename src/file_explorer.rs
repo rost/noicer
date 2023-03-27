@@ -142,55 +142,51 @@ fn handle_keypress(state: &mut State) -> anyhow::Result<()> {
     if !state.search {
         state.search_term = String::new();
 
-        let mut simple_op = parse_line(state.line.as_str());
-        match &simple_op {
-            Some(o) => match &o.optype {
-                OpType::Opq => std::process::exit(0),
-                OpType::OpG => state.cursor.move_bottom()?,
-                OpType::Opj => state.cursor.move_down(1)?,
-                OpType::Opk => state.cursor.move_up(1)?,
-                OpType::Oph => state.cursor.move_out()?,
-                OpType::Opl => {
-                    if state.cursor.selected().is_dir() {
-                        state.cursor.move_in()?
-                    } else {
-                        run_prog("bat", &state.cursor.selected())?
-                    }
-                }
-                OpType::Opdot => state.cursor.toggle_hidden_files()?,
-                OpType::Opcasing => state.cursor.toggle_case_sensitivity()?,
-                OpType::Opsortdir => state.cursor.sort_dir()?,
-                OpType::Opsortname => state.cursor.sort_name()?,
-                OpType::Opsortsize => state.cursor.sort_size()?,
-                OpType::Opsorttime => state.cursor.sort_time()?,
-                OpType::Opslash => state.toggle_search(),
-                OpType::Oppage => run_prog("bat", &state.cursor.selected())?,
-                OpType::Opedit => run_prog("vi", &state.cursor.selected())?,
-                OpType::Opbang => run_prog("fish", &state.cursor.current_dir())?,
-                _ => simple_op = None,
-            },
-            None => simple_op = None,
-        }
+        let op = run_op(state)?;
 
-        let mut complex_op = None;
-        if state.line.len() > 1 {
-            complex_op = parse_line(state.line.as_str());
-            match &complex_op {
-                Some(o) => match &o.optype {
-                    OpType::Opgg => state.cursor.move_top()?,
-                    OpType::Opnj => state.cursor.move_down(o.arg.parse::<i32>()?)?,
-                    OpType::Opnk => state.cursor.move_up(o.arg.parse::<i32>()?)?,
-                    _ => complex_op = None,
-                },
-                None => complex_op = None,
-            }
-        }
-
-        if simple_op.is_some() || complex_op.is_some() || state.line.len() > 2 {
+        if op.is_some() || state.line.len() > 2 {
             state.line = String::new();
         }
     }
     Ok(())
+}
+
+fn run_op(state: &mut State) -> anyhow::Result<Option<Op>> {
+    let mut op = parse_op(state.line.as_str());
+    match &op {
+        Some(o) => match &o.optype {
+            // simple
+            OpType::Opq => std::process::exit(0),
+            OpType::OpG => state.cursor.move_bottom()?,
+            OpType::Opj => state.cursor.move_down(1)?,
+            OpType::Opk => state.cursor.move_up(1)?,
+            OpType::Oph => state.cursor.move_out()?,
+            OpType::Opl => {
+                if state.cursor.selected().is_dir() {
+                    state.cursor.move_in()?
+                } else {
+                    run_prog("bat", &state.cursor.selected())?
+                }
+            }
+            OpType::Opdot => state.cursor.toggle_hidden_files()?,
+            OpType::Opcasing => state.cursor.toggle_case_sensitivity()?,
+            OpType::Opsortdir => state.cursor.sort_dir()?,
+            OpType::Opsortname => state.cursor.sort_name()?,
+            OpType::Opsortsize => state.cursor.sort_size()?,
+            OpType::Opsorttime => state.cursor.sort_time()?,
+            OpType::Opslash => state.toggle_search(),
+            OpType::Oppage => run_prog("bat", &state.cursor.selected())?,
+            OpType::Opedit => run_prog("vi", &state.cursor.selected())?,
+            OpType::Opbang => run_prog("fish", &state.cursor.current_dir())?,
+            // complex
+            OpType::Opgg => state.cursor.move_top()?,
+            OpType::Opnj => state.cursor.move_down(o.arg.parse::<i32>()?)?,
+            OpType::Opnk => state.cursor.move_up(o.arg.parse::<i32>()?)?,
+            _ => op = None,
+        },
+        None => op = None,
+    }
+    Ok(op)
 }
 
 fn run_prog(prog: &str, path: &Path) -> anyhow::Result<()> {
@@ -249,7 +245,7 @@ fn format_pathbuf(path: &Path) -> Result<String> {
     Ok(r)
 }
 
-fn parse_line(line: &str) -> Option<Op> {
+fn parse_op(line: &str) -> Option<Op> {
     if line.is_empty() {
         return None;
     }
@@ -266,13 +262,13 @@ struct Op {
 impl Op {
     fn new(op: String, arg: String) -> Self {
         Self {
-            optype: parse_op(&op, &arg),
+            optype: parse_optype(&op, &arg),
             arg,
         }
     }
 }
 
-fn parse_op(op: &str, arg: &str) -> OpType {
+fn parse_optype(op: &str, arg: &str) -> OpType {
     match op {
         "q" => OpType::Opq,
         "G" => OpType::OpG,

@@ -15,7 +15,24 @@ use crossterm::{
 
 use crate::cursor::Cursor;
 
+pub struct Config {
+    editor: String,
+    pager: String,
+    shell: String,
+}
+
+impl Config {
+    fn new() -> Config {
+        Config {
+            editor: String::from("vim"),
+            pager: String::from("less"),
+            shell: String::from("bash"),
+        }
+    }
+}
+
 struct State {
+    config: Config,
     cursor: Cursor,
     line: String,
     search: bool,
@@ -25,6 +42,7 @@ struct State {
 impl State {
     fn new() -> State {
         State {
+            config: Config::new(),
             cursor: Cursor::new(),
             line: String::new(),
             search: false,
@@ -175,9 +193,9 @@ fn run_op(state: &mut State) -> anyhow::Result<Option<Op>> {
             OpType::Opsortsize => state.cursor.sort_size()?,
             OpType::Opsorttime => state.cursor.sort_time()?,
             OpType::Opslash => state.toggle_search(),
-            OpType::Oppage => run_prog("bat", &state.cursor.selected())?,
-            OpType::Opedit => run_prog("vi", &state.cursor.selected())?,
-            OpType::Opbang => run_prog("fish", &state.cursor.current_dir())?,
+            OpType::Oppage => run_prog(&state.config.pager, &state.cursor.selected())?,
+            OpType::Opedit => run_prog(&state.config.editor, &state.cursor.selected())?,
+            OpType::Opbang => run_prog(&state.config.shell, &state.cursor.current_dir())?,
             // complex
             OpType::Opgg => state.cursor.move_top()?,
             OpType::Opnj => state.cursor.move_down(o.arg.parse::<i32>()?)?,

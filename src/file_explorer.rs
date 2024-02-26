@@ -35,6 +35,7 @@ struct State {
     config: Config,
     cursor: Cursor,
     line: String,
+    running: bool,
     search: bool,
     search_term: String,
 }
@@ -45,6 +46,7 @@ impl State {
             config: Config::new(),
             cursor: Cursor::new(),
             line: String::new(),
+            running: true,
             search: false,
             search_term: String::new(),
         }
@@ -68,6 +70,10 @@ where
     state.cursor.init()?;
 
     loop {
+        if !state.running {
+            break;
+        }
+
         queue!(
             w,
             style::ResetColor,
@@ -81,6 +87,7 @@ where
             state.cursor.current_siblings()?,
             state.cursor.pos()?,
         )?;
+
         for line in screen_lines {
             queue!(w, style::Print(&line), cursor::MoveToNextLine(1))?;
         }
@@ -174,7 +181,7 @@ fn run_op(state: &mut State) -> anyhow::Result<Option<Op>> {
     match &op {
         Some(o) => match &o.optype {
             // simple
-            OpType::Opq => std::process::exit(0),
+            OpType::Opq => state.running = false,
             OpType::OpG => state.cursor.move_bottom()?,
             OpType::Opj => state.cursor.move_down(1)?,
             OpType::Opk => state.cursor.move_up(1)?,

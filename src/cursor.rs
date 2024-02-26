@@ -179,8 +179,13 @@ impl Cursor {
             .to_path_buf()
     }
 
-    pub fn current_siblings(&self) -> Result<Vec<PathBuf>> {
-        self.siblings(self.current_dir())
+    pub fn current_siblings(&self) -> Result<Option<Vec<PathBuf>>> {
+        let siblings = self.siblings(self.current_dir())?;
+        if !siblings.is_empty() {
+            Ok(Some(siblings))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn siblings(&self, path: PathBuf) -> Result<Vec<PathBuf>> {
@@ -260,5 +265,11 @@ impl Cursor {
             .position(|p| p == &self.selected)
             .unwrap_or(0) as i32;
         Ok(pos)
+    }
+}
+
+impl Default for Cursor {
+    fn default() -> Self {
+        Self::new()
     }
 }

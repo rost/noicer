@@ -5,7 +5,7 @@ use std::{
     time::UNIX_EPOCH,
 };
 
-use crossterm::Result;
+use anyhow::Result;
 
 pub struct Cursor {
     hide: bool,

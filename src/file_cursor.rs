@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::Result;
 
-pub struct Cursor {
+pub struct FileCursor {
     hide: bool,
     casing: bool,
     sort: Sort,
@@ -22,9 +22,9 @@ pub enum Sort {
     Time,
 }
 
-impl Cursor {
-    pub fn new() -> Cursor {
-        Cursor {
+impl FileCursor {
+    pub fn new() -> Self {
+        Self {
             hide: true,
             casing: false,
             sort: Sort::Name,
@@ -268,7 +268,7 @@ impl Cursor {
     }
 }
 
-impl Default for Cursor {
+impl Default for FileCursor {
     fn default() -> Self {
         Self::new()
     }

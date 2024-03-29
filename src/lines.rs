@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::cursor::Cursor;
+use crate::file_cursor::FileCursor;
 
 pub struct Lines {}
 
@@ -15,7 +15,7 @@ impl Lines {
         Self {}
     }
 
-    pub fn format(&self, cursor: &Cursor) -> anyhow::Result<Vec<String>> {
+    pub fn format(&self, cursor: &FileCursor) -> anyhow::Result<Vec<String>> {
         let rows = match cursor.current_siblings()? {
             Some(content) => content,
             None => vec![PathBuf::from("   ../")],

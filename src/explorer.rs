@@ -8,7 +8,7 @@ use crossterm::{
     event::{self, Event}, execute, queue, style, terminal::{self, ClearType}
 };
 
-use crate::{cursor::Cursor, engine::{Mode, OpType}};
+use crate::{file_cursor::FileCursor, engine::{Mode, OpType}};
 use crate::engine::Engine;
 use crate::lines::Lines;
 
@@ -51,10 +51,10 @@ where
     terminal::enable_raw_mode()?;
 
     let mut state = State::new();
-    let mut cursor = Cursor::new();
+    let mut file_cursor = FileCursor::new();
     let mut engine = Engine::new();
 
-    cursor.init()?;
+    file_cursor.init()?;
 
     loop {
         if !state.running {
@@ -69,7 +69,7 @@ where
             crossterm::cursor::MoveTo(1, 1)
         )?;
 
-        let lines = Lines::new().format(&cursor)?;
+        let lines = Lines::new().format(&file_cursor)?;
 
         for line in lines {
             queue!(w, style::Print(&line), crossterm::cursor::MoveToNextLine(1))?;
@@ -86,10 +86,10 @@ where
 
         w.flush()?;
 
-        match handle_keypress(&mut cursor, &mut engine) {
+        match handle_keypress(&mut file_cursor, &mut engine) {
             Ok(res) => {
                 if let Some(op) = res {
-                    let _res = run_op(&mut state, op, &mut cursor, &mut engine)?;
+                    let _res = run_op(&mut state, op, &mut file_cursor, &mut engine)?;
                 }
             }
             Err(_) => {
@@ -108,7 +108,7 @@ where
     Ok(terminal::disable_raw_mode()?)
 }
 
-fn handle_keypress(cursor: &mut Cursor, engine: &mut Engine) -> anyhow::Result<Option<OpType>> {
+fn handle_keypress(cursor: &mut FileCursor, engine: &mut Engine) -> anyhow::Result<Option<OpType>> {
     let mut op = None;
     if let Event::Key(ke) = event::read()? {
         op = engine.push(ke)?;
@@ -124,7 +124,7 @@ fn handle_keypress(cursor: &mut Cursor, engine: &mut Engine) -> anyhow::Result<O
     Ok(op)
 }
 
-fn run_op(state: &mut State, op: OpType, cursor: &mut Cursor, engine: &mut Engine) -> anyhow::Result<bool> {
+fn run_op(state: &mut State, op: OpType, cursor: &mut FileCursor, engine: &mut Engine) -> anyhow::Result<bool> {
     match op {
         // simple
         OpType::Opq => state.running = false,

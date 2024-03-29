@@ -1,45 +1,83 @@
 use std::{
-    collections::HashMap,
-    ffi::OsStr,
-    path::{Path, PathBuf},
-    time::UNIX_EPOCH,
+    collections::HashMap, ffi::OsStr, fs::File, path::{Path, PathBuf}, time::UNIX_EPOCH
 };
 
 use anyhow::Result;
+use tar::Archive;
 
 use crate::cursor::{Cursor, Sort};
 
-pub struct FileCursor {
+pub struct TarCursor {
     hide: bool,
     casing: bool,
     sort: Sort,
-    paths: HashMap<PathBuf, PathBuf>,
+    archive: Option<Archive<File>>,
     start_cwd: Option<PathBuf>,
+    tree: HashMap<PathBuf, Vec<PathBuf>>,
+    paths: HashMap<PathBuf, PathBuf>,
     selected: PathBuf,
 }
 
-impl FileCursor {
+impl TarCursor {
     pub fn new() -> Self {
         Self {
             hide: true,
             casing: false,
             sort: Sort::Name,
-            paths: HashMap::new(),
+            archive: None,
             start_cwd: None,
+            tree: HashMap::new(),
+            paths: HashMap::new(),
             selected: PathBuf::new(),
         }
     }
 }
 
-impl Cursor for FileCursor {
+use std::collections::hash_map::Entry;
+
+impl Cursor for TarCursor {
     fn init(&mut self, cwd: &PathBuf) -> Result<()> {
-        self.start_cwd = Some(cwd.clone());
-        self.paths = HashMap::new();
-        self.selected = if let Some(p) = self.siblings(std::env::current_dir()?)?.first() {
-            p.clone()
-        } else {
-            std::env::current_dir()?.join(PathBuf::from(".."))
-        };
+        if self.start_cwd != Some(cwd.clone()) {
+            self.paths = HashMap::new();
+            self.start_cwd = Some(cwd.clone());
+            self.archive = Some(Archive::new(File::open(cwd.to_str().unwrap()).unwrap()));
+
+            // populate tree
+            let mut tree: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+            match &mut self.archive {
+                Some(archive) => {
+                    for entry in archive.entries().unwrap() {
+                        let entry = entry.unwrap();
+                        let path = entry.path().unwrap().to_path_buf();
+                        let parent = match path.parent().unwrap() == PathBuf::from("") {
+                            true => PathBuf::from(cwd.to_str().unwrap()),
+                            false => PathBuf::from(format!("{}/{}/", cwd.to_str().unwrap(), path.parent().unwrap_or(Path::new("")).to_str().unwrap())),
+                        };
+
+                        let file = if path.to_str().unwrap().ends_with('/') {
+                            PathBuf::from(format!("{}/{}/", cwd.to_str().unwrap(), path.to_str().unwrap()))
+                        } else {
+                            PathBuf::from(format!("{}/{}", cwd.to_str().unwrap(), path.to_str().unwrap()))
+                        };
+
+                        if let Entry::Vacant(e) = tree.entry(parent.clone()) {
+                            e.insert(vec![file]);
+                        } else {
+                            tree.get_mut(&parent).unwrap().push(file);
+                        }
+                    }
+                }
+                None => (),
+            }
+
+            self.tree = tree;
+
+            self.selected = PathBuf::from(
+                format!("{}",
+                self.siblings(self.start_cwd.clone().unwrap())?.first().unwrap().display())
+                );
+            }
+
         Ok(())
     }
 
@@ -66,12 +104,12 @@ impl Cursor for FileCursor {
     }
 
     fn move_in(&mut self) -> Result<()> {
-        if self.selected().is_dir()
+        if self.selected().to_str().unwrap().ends_with('/')
             && self.selected() != self.current_dir()
             && !self.selected().ends_with("..")
         {
             self.paths.insert(self.current_dir(), self.selected());
-            self.selected = if let Some(p) = self.paths.get(&self.selected()) {
+            let selected = if let Some(p) = self.paths.get(&self.selected()) {
                 p.clone()
             } else {
                 match self.siblings(self.selected())?.first() {
@@ -79,7 +117,7 @@ impl Cursor for FileCursor {
                     None => self.selected().join(PathBuf::from("..")),
                 }
             };
-            std::env::set_current_dir(self.current_dir())?;
+            self.selected = selected
         }
         Ok(())
     }
@@ -91,7 +129,6 @@ impl Cursor for FileCursor {
                 Some(p) => p.clone(),
                 None => self.current_dir(),
             };
-            std::env::set_current_dir(self.current_dir())?;
         }
         Ok(())
     }
@@ -173,7 +210,7 @@ impl Cursor for FileCursor {
     }
 
     fn start_dir(&self) -> PathBuf {
-        self.start_cwd.clone().unwrap_or_default()
+        self.start_cwd.clone().unwrap()
     }
 
     fn parent(&self) -> PathBuf {
@@ -193,25 +230,11 @@ impl Cursor for FileCursor {
     }
 
     fn siblings(&mut self, path: PathBuf) -> Result<Vec<PathBuf>> {
-        let mut siblings = Vec::new();
-        for entry in std::fs::read_dir(path)? {
-            let path = &entry?.path();
-            if self.hide && self.hidden(path) {
-                continue;
-            } else {
-                siblings.push(path.clone())
-            }
-        }
-        match self.sort {
-            Sort::Dir => self.sort_by_dir(&mut siblings),
-            Sort::Name => self.sort_by_name(&mut siblings),
-            Sort::Size => self.sort_by_size(&mut siblings),
-            Sort::Time => self.sort_by_time(&mut siblings),
-        }
-        match self.casing {
-            true => self.sort_by_casing(&mut siblings),
-            false => (),
-        }
+        let siblings = if let Some(s) = self.tree.get(&path) {
+            s.clone()
+        } else {
+            Vec::new()
+        };
         Ok(siblings)
     }
 
@@ -267,9 +290,8 @@ impl Cursor for FileCursor {
             .siblings(self.current_dir())?
             .iter()
             .position(|p| {
-                // println!("{:?}", p);
-                // println!("{:?}", &self.selected);
-                p == &self.selected
+                let f = &PathBuf::from(self.selected.file_name().unwrap());
+                p.file_name().unwrap() == f
             }
             )
             .unwrap_or(0) as i32;
@@ -277,7 +299,7 @@ impl Cursor for FileCursor {
     }
 }
 
-impl Default for FileCursor {
+impl Default for TarCursor {
     fn default() -> Self {
         Self::new()
     }

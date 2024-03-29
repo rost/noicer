@@ -8,8 +8,10 @@ use crossterm::{
     event::{self, Event}, execute, queue, style, terminal::{self, ClearType}
 };
 
-use crate::{file_cursor::FileCursor, engine::{Mode, OpType}};
-use crate::engine::Engine;
+use crate::cursor::Cursor;
+use crate::engine::{Engine, Mode, OpType};
+use crate::file_cursor::FileCursor;
+use crate::tar_cursor::TarCursor;
 use crate::lines::Lines;
 
 pub struct Config {
@@ -31,6 +33,7 @@ impl Config {
 pub struct State {
     pub config: Config,
     pub running: bool,
+    pub tar: bool,
 }
 
 impl State {
@@ -38,6 +41,7 @@ impl State {
         State {
             config: Config::new(),
             running: true,
+            tar: false,
         }
     }
 }
@@ -52,9 +56,12 @@ where
 
     let mut state = State::new();
     let mut file_cursor = FileCursor::new();
+    let mut tar_cursor = TarCursor::new();
     let mut engine = Engine::new();
 
-    file_cursor.init()?;
+    let cwd = std::env::current_dir()?;
+
+    file_cursor.init(&cwd)?;
 
     loop {
         if !state.running {
@@ -69,7 +76,13 @@ where
             crossterm::cursor::MoveTo(1, 1)
         )?;
 
-        let lines = Lines::new().format(&file_cursor)?;
+        let lines = match state.tar {
+            true => {
+                tar_cursor.init(&file_cursor.selected())?;
+                Lines::new().format(&mut tar_cursor)?
+            },
+            false => Lines::new().format(&mut file_cursor)?,
+        };
 
         for line in lines {
             queue!(w, style::Print(&line), crossterm::cursor::MoveToNextLine(1))?;
@@ -86,16 +99,33 @@ where
 
         w.flush()?;
 
-        match handle_keypress(&mut file_cursor, &mut engine) {
-            Ok(res) => {
-                if let Some(op) = res {
-                    let _res = run_op(&mut state, op, &mut file_cursor, &mut engine)?;
+        match state.tar {
+            true => {
+                match handle_keypress(&mut tar_cursor, &mut engine) {
+                    Ok(res) => {
+                        if let Some(op) = res {
+                            let _res = run_op(&mut state, op, &mut tar_cursor, &mut engine)?;
+                        }
+                    }
+                    Err(_) => {
+                        break;
+                    }
                 }
             }
-            Err(_) => {
-                break;
+            false => {
+                match handle_keypress(&mut file_cursor, &mut engine) {
+                    Ok(res) => {
+                        if let Some(op) = res {
+                            let _res = run_op(&mut state, op, &mut file_cursor, &mut engine)?;
+                        }
+                    }
+                    Err(_) => {
+                        break;
+                    }
+                }
             }
         }
+
     }
 
     execute!(
@@ -108,7 +138,7 @@ where
     Ok(terminal::disable_raw_mode()?)
 }
 
-fn handle_keypress(cursor: &mut FileCursor, engine: &mut Engine) -> anyhow::Result<Option<OpType>> {
+fn handle_keypress(cursor: &mut dyn Cursor, engine: &mut Engine) -> anyhow::Result<Option<OpType>> {
     let mut op = None;
     if let Event::Key(ke) = event::read()? {
         op = engine.push(ke)?;
@@ -124,17 +154,25 @@ fn handle_keypress(cursor: &mut FileCursor, engine: &mut Engine) -> anyhow::Resu
     Ok(op)
 }
 
-fn run_op(state: &mut State, op: OpType, cursor: &mut FileCursor, engine: &mut Engine) -> anyhow::Result<bool> {
+fn run_op(state: &mut State, op: OpType, cursor: &mut dyn Cursor, engine: &mut Engine) -> anyhow::Result<bool> {
     match op {
         // simple
         OpType::Opq => state.running = false,
         OpType::OpG => cursor.move_bottom()?,
         OpType::Opj(n) => cursor.move_down(n)?,
         OpType::Opk(n) => cursor.move_up(n)?,
-        OpType::Oph => cursor.move_out()?,
+        OpType::Oph => {
+            if state.tar && cursor.selected().parent().unwrap() == cursor.start_dir() {
+                state.tar = false
+            } else {
+                cursor.move_out()?
+            }
+        }
         OpType::Opl => {
-            if cursor.selected().is_dir() {
+            if cursor.selected().is_dir() || cursor.selected().to_str().unwrap().ends_with('/') {
                 cursor.move_in()?
+            } else if cursor.selected().extension().unwrap_or_default() == "tar" {
+                state.tar = true;
             } else {
                 run_prog("bat", &cursor.selected())?
             }

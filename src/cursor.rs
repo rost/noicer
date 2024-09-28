@@ -7,8 +7,8 @@ pub enum Sort {
     Time,
 }
 
-pub(crate) trait Cursor { 
-    fn init(&mut self, cwd: &PathBuf) -> anyhow::Result<()>;
+pub(crate) trait Cursor {
+    fn init(&mut self, cwd: &Path) -> anyhow::Result<()>;
     fn move_down(&mut self, n: i32) -> anyhow::Result<()>;
     fn move_up(&mut self, n: i32) -> anyhow::Result<()>;
     fn move_in(&mut self) -> anyhow::Result<()>;

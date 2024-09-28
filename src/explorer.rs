@@ -1,18 +1,18 @@
-use std::{
-    io::Write, path::Path
-};
+use std::{io::Write, path::Path};
 
 use std::process::Command;
 
 use crossterm::{
-    event::{self, Event}, execute, queue, style, terminal::{self, ClearType}
+    event::{self, Event},
+    execute, queue, style,
+    terminal::{self, ClearType},
 };
 
 use crate::cursor::Cursor;
 use crate::engine::{Engine, Mode, OpType};
 use crate::file_cursor::FileCursor;
-use crate::tar_cursor::TarCursor;
 use crate::lines::Lines;
+use crate::tar_cursor::TarCursor;
 
 pub struct Config {
     pub editor: String,
@@ -80,7 +80,7 @@ where
             true => {
                 tar_cursor.init(&file_cursor.selected())?;
                 Lines::new().format(&mut tar_cursor)?
-            },
+            }
             false => Lines::new().format(&mut file_cursor)?,
         };
 
@@ -100,32 +100,27 @@ where
         w.flush()?;
 
         match state.tar {
-            true => {
-                match handle_keypress(&mut tar_cursor, &mut engine) {
-                    Ok(res) => {
-                        if let Some(op) = res {
-                            let _res = run_op(&mut state, op, &mut tar_cursor, &mut engine)?;
-                        }
-                    }
-                    Err(_) => {
-                        break;
+            true => match handle_keypress(&mut tar_cursor, &mut engine) {
+                Ok(res) => {
+                    if let Some(op) = res {
+                        let _res = run_op(&mut state, op, &mut tar_cursor, &mut engine)?;
                     }
                 }
-            }
-            false => {
-                match handle_keypress(&mut file_cursor, &mut engine) {
-                    Ok(res) => {
-                        if let Some(op) = res {
-                            let _res = run_op(&mut state, op, &mut file_cursor, &mut engine)?;
-                        }
-                    }
-                    Err(_) => {
-                        break;
+                Err(_) => {
+                    break;
+                }
+            },
+            false => match handle_keypress(&mut file_cursor, &mut engine) {
+                Ok(res) => {
+                    if let Some(op) = res {
+                        let _res = run_op(&mut state, op, &mut file_cursor, &mut engine)?;
                     }
                 }
-            }
+                Err(_) => {
+                    break;
+                }
+            },
         }
-
     }
 
     execute!(
@@ -149,12 +144,17 @@ fn handle_keypress(cursor: &mut dyn Cursor, engine: &mut Engine) -> anyhow::Resu
     if engine.mode() != &Mode::Search {
         engine.clear_search_term();
     } else {
-        return Ok(None)
+        return Ok(None);
     }
     Ok(op)
 }
 
-fn run_op(state: &mut State, op: OpType, cursor: &mut dyn Cursor, engine: &mut Engine) -> anyhow::Result<bool> {
+fn run_op(
+    state: &mut State,
+    op: OpType,
+    cursor: &mut dyn Cursor,
+    engine: &mut Engine,
+) -> anyhow::Result<bool> {
     match op {
         // simple
         OpType::Opq => state.running = false,
@@ -162,14 +162,17 @@ fn run_op(state: &mut State, op: OpType, cursor: &mut dyn Cursor, engine: &mut E
         OpType::Opj(n) => cursor.move_down(n)?,
         OpType::Opk(n) => cursor.move_up(n)?,
         OpType::Oph => {
-            if state.tar && cursor.selected().parent().unwrap() == cursor.start_dir() {
+            if state.tar
+                && cursor.selected().parent().unwrap_or(Path::new("")) == cursor.start_dir()
+            {
                 state.tar = false
             } else {
                 cursor.move_out()?
             }
         }
         OpType::Opl => {
-            if cursor.selected().is_dir() || cursor.selected().to_str().unwrap().ends_with('/') {
+            if cursor.selected().is_dir() || cursor.selected().to_str().unwrap_or("").ends_with('/')
+            {
                 cursor.move_in()?
             } else if cursor.selected().extension().unwrap_or_default() == "tar" {
                 state.tar = true;

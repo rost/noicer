@@ -32,8 +32,8 @@ impl FileCursor {
 }
 
 impl Cursor for FileCursor {
-    fn init(&mut self, cwd: &PathBuf) -> Result<()> {
-        self.start_cwd = Some(cwd.clone());
+    fn init(&mut self, cwd: &Path) -> Result<()> {
+        self.start_cwd = Some(cwd.to_path_buf().clone());
         self.paths = HashMap::new();
         self.selected = if let Some(p) = self.siblings(std::env::current_dir()?)?.first() {
             p.clone()
@@ -270,8 +270,7 @@ impl Cursor for FileCursor {
                 // println!("{:?}", p);
                 // println!("{:?}", &self.selected);
                 p == &self.selected
-            }
-            )
+            })
             .unwrap_or(0) as i32;
         Ok(pos)
     }

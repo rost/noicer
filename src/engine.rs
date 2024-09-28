@@ -9,7 +9,7 @@ pub struct Engine {
 #[derive(PartialEq)]
 pub enum Mode {
     Normal,
-    Search
+    Search,
 }
 
 impl Engine {
@@ -23,7 +23,6 @@ impl Engine {
 
     pub fn push(&mut self, ke: KeyEvent) -> anyhow::Result<Option<OpType>> {
         match ke.code {
-
             KeyCode::Char(c) => {
                 if self.mode == Mode::Normal {
                     let op = self.handle_char(c)?;
@@ -68,11 +67,8 @@ impl Engine {
                 }
             }
 
-            _ => {
-                Ok(None)
-            }
+            _ => Ok(None),
         }
-
     }
 
     fn handle_char(&mut self, c: char) -> anyhow::Result<Option<OpType>> {
@@ -80,13 +76,14 @@ impl Engine {
         let op = self.buffer.pop();
         let mut res = None;
         if let Some(op) = op {
-             res = self.parse_op(&op.to_string())?;
+            res = self.parse_op(&op.to_string())?;
         }
         if res != Some(OpType::None) || self.buffer.len() > 2 {
             self.buffer = String::new();
         }
         if res == Some(OpType::None) {
-            self.buffer.push(op.unwrap());
+            self.buffer
+                .push(op.ok_or(anyhow::anyhow!("shouldn't happen"))?);
         }
         Ok(res)
     }
@@ -120,7 +117,7 @@ impl Engine {
             "~" => OpType::Opcasing,
             "d" => OpType::Opsortdir,
             "n" => OpType::Opsortname,
-            "s" => OpType::Opsortsize, 
+            "s" => OpType::Opsortsize,
             "t" => OpType::Opsorttime,
             "/" => OpType::Opslash,
             "p" => OpType::Oppage,
@@ -130,7 +127,8 @@ impl Engine {
             // complex
             "g" => {
                 if !self.buffer.is_empty() {
-                    let o = self.buffer.pop().unwrap().to_string();
+                    let o = self.buffer.pop().unwrap_or_default().to_string();
+
                     if o == "g" {
                         OpType::Opgg
                     } else {
@@ -141,9 +139,7 @@ impl Engine {
                 }
             }
 
-            _ => {
-                OpType::None
-            }
+            _ => OpType::None,
         };
         Ok(Some(op))
     }

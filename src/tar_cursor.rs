@@ -1,5 +1,9 @@
 use std::{
-    collections::HashMap, ffi::OsStr, fs::File, path::{Path, PathBuf}, time::UNIX_EPOCH
+    collections::HashMap,
+    ffi::OsStr,
+    fs::File,
+    path::{Path, PathBuf},
+    time::UNIX_EPOCH,
 };
 
 use anyhow::Result;
@@ -36,10 +40,10 @@ impl TarCursor {
 use std::collections::hash_map::Entry;
 
 impl Cursor for TarCursor {
-    fn init(&mut self, cwd: &PathBuf) -> Result<()> {
-        if self.start_cwd != Some(cwd.clone()) {
+    fn init(&mut self, cwd: &Path) -> Result<()> {
+        if self.start_cwd != Some(cwd.to_path_buf().clone()) {
             self.paths = HashMap::new();
-            self.start_cwd = Some(cwd.clone());
+            self.start_cwd = Some(cwd.to_path_buf().clone());
             self.archive = Some(Archive::new(File::open(cwd.to_str().unwrap()).unwrap()));
 
             // populate tree
@@ -51,13 +55,25 @@ impl Cursor for TarCursor {
                         let path = entry.path().unwrap().to_path_buf();
                         let parent = match path.parent().unwrap() == PathBuf::from("") {
                             true => PathBuf::from(cwd.to_str().unwrap()),
-                            false => PathBuf::from(format!("{}/{}/", cwd.to_str().unwrap(), path.parent().unwrap_or(Path::new("")).to_str().unwrap())),
+                            false => PathBuf::from(format!(
+                                "{}/{}/",
+                                cwd.to_str().unwrap(),
+                                path.parent().unwrap_or(Path::new("")).to_str().unwrap()
+                            )),
                         };
 
                         let file = if path.to_str().unwrap().ends_with('/') {
-                            PathBuf::from(format!("{}/{}/", cwd.to_str().unwrap(), path.to_str().unwrap()))
+                            PathBuf::from(format!(
+                                "{}/{}/",
+                                cwd.to_str().unwrap(),
+                                path.to_str().unwrap()
+                            ))
                         } else {
-                            PathBuf::from(format!("{}/{}", cwd.to_str().unwrap(), path.to_str().unwrap()))
+                            PathBuf::from(format!(
+                                "{}/{}",
+                                cwd.to_str().unwrap(),
+                                path.to_str().unwrap()
+                            ))
                         };
 
                         if let Entry::Vacant(e) = tree.entry(parent.clone()) {
@@ -72,11 +88,14 @@ impl Cursor for TarCursor {
 
             self.tree = tree;
 
-            self.selected = PathBuf::from(
-                format!("{}",
-                self.siblings(self.start_cwd.clone().unwrap())?.first().unwrap().display())
-                );
-            }
+            self.selected = PathBuf::from(format!(
+                "{}",
+                self.siblings(self.start_cwd.clone().unwrap())?
+                    .first()
+                    .unwrap()
+                    .display()
+            ));
+        }
 
         Ok(())
     }
@@ -292,8 +311,7 @@ impl Cursor for TarCursor {
             .position(|p| {
                 let f = &PathBuf::from(self.selected.file_name().unwrap());
                 p.file_name().unwrap() == f
-            }
-            )
+            })
             .unwrap_or(0) as i32;
         Ok(pos)
     }

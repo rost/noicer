@@ -26,8 +26,12 @@ impl Lines {
         lines.push(String::from(""));
 
         for path in rows {
-            let s = path.file_name().unwrap_or_default().to_str().unwrap_or_default();
-            let s = match path.is_dir() || path.to_str().unwrap().ends_with('/') {
+            let s = path
+                .file_name()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default();
+            let s = match path.is_dir() || path.to_str().unwrap_or("").ends_with('/') {
                 true => format!("   {s}/"),
                 false => format!("   {s}"),
             };

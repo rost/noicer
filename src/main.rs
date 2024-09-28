@@ -1,11 +1,11 @@
 use std::io;
 
-pub mod file_cursor;
-pub mod tar_cursor;
+pub mod cursor;
 pub mod engine;
 pub mod explorer;
+pub mod file_cursor;
 pub mod lines;
-pub mod cursor;
+pub mod tar_cursor;
 
 fn main() -> anyhow::Result<()> {
     let mut stdout = io::stdout();

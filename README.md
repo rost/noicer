@@ -15,6 +15,7 @@ A simple file browser for the terminal. Inspired by `noice`.
 - [x] sort by dir, name, size, time using `d`, `n`, `s`, `t`
 - [x] case sensitive sorting using `i`
 - [x] search using `/`
+- [x] toggle statusbar using `?`
 - [ ] filter using `:g/term`
 - [ ] add more vim keybindings
   - [x] `gg`

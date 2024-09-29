@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+#[derive(Clone)]
 pub enum Sort {
     Dir,
     Name,
@@ -17,6 +18,7 @@ pub(crate) trait Cursor {
     fn move_top(&mut self) -> anyhow::Result<()>;
     fn toggle_hidden_files(&mut self) -> anyhow::Result<()>;
     fn toggle_case_sensitivity(&mut self) -> anyhow::Result<()>;
+    fn sort(&self) -> Sort;
     fn sort_dir(&mut self) -> anyhow::Result<()>;
     fn sort_name(&mut self) -> anyhow::Result<()>;
     fn sort_size(&mut self) -> anyhow::Result<()>;

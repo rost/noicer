@@ -9,7 +9,7 @@ use crossterm::{
 };
 use tempfile::NamedTempFile;
 
-use crate::cursor::Cursor;
+use crate::cursor::{Cursor, Sort};
 use crate::engine::{Engine, Mode, OpType};
 use crate::file_cursor::FileCursor;
 use crate::lines::Lines;
@@ -34,6 +34,7 @@ impl Config {
 pub struct State {
     pub config: Config,
     pub running: bool,
+    pub status_bar: bool,
     pub tar: bool,
 }
 
@@ -42,6 +43,7 @@ impl State {
         State {
             config: Config::new(),
             running: true,
+            status_bar: false,
             tar: false,
         }
     }
@@ -89,12 +91,22 @@ where
             queue!(w, style::Print(&line), crossterm::cursor::MoveToNextLine(1))?;
         }
 
+        let (term_width, term_height) = terminal::size()?;
         if engine.mode() == &Mode::Search {
-            let (_, term_height) = terminal::size()?;
             queue!(
                 w,
-                crossterm::cursor::MoveTo(0, term_height),
+                crossterm::cursor::MoveTo(0, term_height - 1),
                 style::Print(format!("/{}", &engine.search_term()))
+            )?;
+        } else if state.status_bar {
+            let status_bar = create_status_bar(&file_cursor, &engine);
+            queue!(
+                w,
+                crossterm::cursor::MoveTo(0, term_height - 1),
+                // style::SetBackgroundColor(style::Color::DarkGrey),
+                style::SetForegroundColor(style::Color::White),
+                style::Print(format!("{:<1$}", status_bar, term_width as usize)),
+                style::ResetColor
             )?;
         }
 
@@ -198,6 +210,7 @@ fn run_op(
         OpType::Oppage => run_prog(&state.config.pager, &cursor.selected())?,
         OpType::Opedit => run_prog(&state.config.editor, &cursor.selected())?,
         OpType::Opbang => run_prog(&state.config.shell, &cursor.current_dir())?,
+        OpType::Opquestion => state.status_bar = !state.status_bar,
         // complex
         OpType::Opgg => cursor.move_top()?,
         _ => return Ok(false),
@@ -220,4 +233,21 @@ pub fn run_prog(prog: &str, path: &Path) -> anyhow::Result<()> {
     };
     out.wait().expect("failed while waiting");
     Ok(())
+}
+
+fn create_status_bar(cursor: &dyn Cursor, _engine: &Engine) -> String {
+    let sorting = match cursor.sort() {
+        Sort::Dir => "D",
+        Sort::Name => "N",
+        Sort::Size => "S",
+        Sort::Time => "T",
+    };
+    let selected = cursor.selected();
+    let selected_name = selected.file_name().unwrap_or_default().to_string_lossy();
+    let selected_name = if selected.is_dir() {
+        format!("{}/", selected_name)
+    } else {
+        selected_name.to_string()
+    };
+    format!(" Selected: {} | Sorting: {}", selected_name, sorting)
 }

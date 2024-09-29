@@ -123,6 +123,7 @@ impl Engine {
             "p" => OpType::Oppage,
             "e" => OpType::Opedit,
             "!" => OpType::Opbang,
+            "?" => OpType::Opquestion,
 
             // complex
             "g" => {
@@ -201,5 +202,6 @@ pub enum OpType {
     Opedit,
     Opbang,
     Opabort,
+    Opquestion,
     None,
 }

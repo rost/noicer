@@ -200,6 +200,10 @@ impl Cursor for TarCursor {
         Ok(())
     }
 
+    fn sort(&self) -> Sort {
+        self.sort.clone()
+    }
+
     fn sort_dir(&mut self) -> Result<()> {
         self.sort = Sort::Dir;
         Ok(())

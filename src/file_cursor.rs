@@ -223,6 +223,10 @@ impl Cursor for FileCursor {
             .starts_with('.')
     }
 
+    fn sort(&self) -> Sort {
+        self.sort.clone()
+    }
+
     fn sort_by_casing(&self, siblings: &mut [PathBuf]) {
         if self.casing {
             siblings.sort_by(|a, b| {

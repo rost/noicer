@@ -36,6 +36,5 @@ pub(crate) trait Cursor {
     fn sort_by_time(&self, siblings: &mut [PathBuf]);
     fn sort_by_size(&self, siblings: &mut [PathBuf]);
     fn pos(&mut self) -> anyhow::Result<i32>;
-    fn as_any(&self) -> &dyn std::any::Any;
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 }

@@ -59,42 +59,46 @@ impl Cursor for TarCursor {
         if self.start_cwd != Some(cwd.to_path_buf().clone()) {
             self.paths = HashMap::new();
             self.start_cwd = Some(cwd.to_path_buf().clone());
-            self.archive = Some(Archive::new(File::open(cwd.to_str().unwrap()).unwrap()));
+            if let Some(file_path) = cwd.to_str() {
+                let file = File::open(file_path)?;
+                self.archive = Some(Archive::new(file));
+            } else {
+                return Ok(());
+            }
 
             // populate tree
             let mut tree: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
             match &mut self.archive {
                 Some(archive) => {
-                    for entry in archive.entries().unwrap() {
-                        let entry = entry.unwrap();
-                        let path = entry.path().unwrap().to_path_buf();
-                        let parent = match path.parent().unwrap() == PathBuf::from("") {
-                            true => PathBuf::from(cwd.to_str().unwrap()),
-                            false => PathBuf::from(format!(
-                                "{}/{}/",
-                                cwd.to_str().unwrap(),
-                                path.parent().unwrap_or(Path::new("")).to_str().unwrap()
-                            )),
+                    for entry in archive.entries()? {
+                        let entry = entry?;
+                        let path = entry.path()?.to_path_buf();
+
+                        let parent = if path.parent() == Some(Path::new("")) {
+                            cwd.to_str().unwrap_or("").into()
+                        } else {
+                            let cwd_str = cwd.to_str().unwrap_or("");
+                            let parent_str = path.parent().and_then(|p| p.to_str()).unwrap_or("");
+                            PathBuf::from(format!("{}/{}/", cwd_str, parent_str))
                         };
 
-                        let file = if path.to_str().unwrap().ends_with('/') {
-                            PathBuf::from(format!(
-                                "{}/{}/",
-                                cwd.to_str().unwrap(),
-                                path.to_str().unwrap()
-                            ))
-                        } else {
-                            PathBuf::from(format!(
-                                "{}/{}",
-                                cwd.to_str().unwrap(),
-                                path.to_str().unwrap()
-                            ))
-                        };
+                        let file = cwd
+                            .to_str()
+                            .and_then(|cwd_str| {
+                                path.to_str().map(|path_str| {
+                                    if path_str.ends_with('/') {
+                                        PathBuf::from(format!("{}/{}/", cwd_str, path_str))
+                                    } else {
+                                        PathBuf::from(format!("{}/{}", cwd_str, path_str))
+                                    }
+                                })
+                            })
+                            .unwrap_or_else(|| PathBuf::from(cwd));
 
                         if let Entry::Vacant(e) = tree.entry(parent.clone()) {
                             e.insert(vec![file]);
                         } else {
-                            tree.get_mut(&parent).unwrap().push(file);
+                            tree.entry(parent).or_insert(Vec::new()).push(file);
                         }
                     }
                 }
@@ -103,13 +107,16 @@ impl Cursor for TarCursor {
 
             self.tree = tree;
 
-            self.selected = PathBuf::from(format!(
-                "{}",
-                self.siblings(self.start_cwd.clone().unwrap())?
-                    .first()
-                    .unwrap()
-                    .display()
-            ));
+            self.selected = match self.start_cwd.as_ref() {
+                Some(start_cwd) => match self.siblings(start_cwd.to_path_buf()) {
+                    Ok(siblings) => siblings
+                        .first()
+                        .map(|s| s.to_path_buf())
+                        .unwrap_or_else(|| PathBuf::from("")),
+                    Err(_) => PathBuf::from(""),
+                },
+                None => PathBuf::from(""),
+            };
         }
 
         Ok(())
@@ -138,7 +145,11 @@ impl Cursor for TarCursor {
     }
 
     fn move_in(&mut self) -> Result<()> {
-        if self.selected().to_str().unwrap().ends_with('/')
+        if self
+            .selected()
+            .to_str()
+            .map(|s| s.ends_with('/'))
+            .unwrap_or(false)
             && self.selected() != self.current_dir()
             && !self.selected().ends_with("..")
         {
@@ -244,7 +255,7 @@ impl Cursor for TarCursor {
     }
 
     fn start_dir(&self) -> PathBuf {
-        self.start_cwd.clone().unwrap()
+        self.start_cwd.clone().unwrap_or_default()
     }
 
     fn parent(&self) -> PathBuf {
@@ -323,16 +334,9 @@ impl Cursor for TarCursor {
         let pos = self
             .siblings(self.current_dir())?
             .iter()
-            .position(|p| {
-                let f = &PathBuf::from(self.selected.file_name().unwrap());
-                p.file_name().unwrap() == f
-            })
+            .position(|p| self.selected.file_name() == p.file_name())
             .unwrap_or(0) as i32;
         Ok(pos)
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {

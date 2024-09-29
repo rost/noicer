@@ -25,4 +25,5 @@ A simple file browser for the terminal. Inspired by `noice`.
   - [ ] ~~set PWD for underlying shell?~~
   - [x] spawn new shell?
 - [ ] support seamlessly opening archive files
-  - [ ] `tar`, `gz`, `zip`, etc.
+  - [x] `tar`
+  - [ ] `gz`, `zip`, etc.

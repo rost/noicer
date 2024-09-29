@@ -87,6 +87,12 @@ where
             false => Lines::new().format(&mut file_cursor)?,
         };
 
+        let cursor: &mut dyn Cursor = if state.tar {
+            &mut tar_cursor
+        } else {
+            &mut file_cursor
+        };
+
         for line in lines {
             queue!(w, style::Print(&line), crossterm::cursor::MoveToNextLine(1))?;
         }
@@ -99,7 +105,7 @@ where
                 style::Print(format!("/{}", &engine.search_term()))
             )?;
         } else if state.status_bar {
-            let status_bar = create_status_bar(&file_cursor, &engine);
+            let status_bar = create_status_bar(cursor, &engine);
             queue!(
                 w,
                 crossterm::cursor::MoveTo(0, term_height - 1),
@@ -112,27 +118,12 @@ where
 
         w.flush()?;
 
-        match state.tar {
-            true => match handle_keypress(&mut tar_cursor, &mut engine) {
-                Ok(res) => {
-                    if let Some(op) = res {
-                        let _res = run_op(&mut state, op, &mut tar_cursor, &mut engine)?;
-                    }
-                }
-                Err(_) => {
-                    break;
-                }
-            },
-            false => match handle_keypress(&mut file_cursor, &mut engine) {
-                Ok(res) => {
-                    if let Some(op) = res {
-                        let _res = run_op(&mut state, op, &mut file_cursor, &mut engine)?;
-                    }
-                }
-                Err(_) => {
-                    break;
-                }
-            },
+        match handle_keypress(cursor, &mut engine) {
+            Ok(Some(op)) => {
+                let _res = run_op(&mut state, op, cursor, &mut engine)?;
+            }
+            Ok(None) => {}
+            Err(_) => break,
         }
     }
 

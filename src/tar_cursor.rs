@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     ffi::OsStr,
     fs::File,
+    io::Read,
     path::{Path, PathBuf},
     time::UNIX_EPOCH,
 };
@@ -34,6 +35,20 @@ impl TarCursor {
             paths: HashMap::new(),
             selected: PathBuf::new(),
         }
+    }
+
+    pub fn read_file_content(&mut self, path: &Path) -> Result<Vec<u8>> {
+        let relative_path = path.strip_prefix(&self.start_dir())?;
+        let mut archive = Archive::new(File::open(&self.start_dir())?);
+        let mut entry = archive
+            .entries()?
+            .filter_map(|e| e.ok())
+            .find(|e| e.path().ok().map(|p| p == relative_path).unwrap_or(false))
+            .ok_or_else(|| anyhow::anyhow!("File not found in archive"))?;
+
+        let mut buffer = Vec::new();
+        entry.read_to_end(&mut buffer)?;
+        Ok(buffer)
     }
 }
 
@@ -314,6 +329,14 @@ impl Cursor for TarCursor {
             })
             .unwrap_or(0) as i32;
         Ok(pos)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 

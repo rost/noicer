@@ -7,6 +7,7 @@ use crossterm::{
     execute, queue, style,
     terminal::{self, ClearType},
 };
+use tempfile::NamedTempFile;
 
 use crate::cursor::Cursor;
 use crate::engine::{Engine, Mode, OpType};
@@ -171,13 +172,21 @@ fn run_op(
             }
         }
         OpType::Opl => {
-            if cursor.selected().is_dir() || cursor.selected().to_str().unwrap_or("").ends_with('/')
-            {
+            let selected = cursor.selected();
+            if selected.is_dir() || selected.to_str().unwrap_or("").ends_with('/') {
                 cursor.move_in()?
-            } else if cursor.selected().extension().unwrap_or_default() == "tar" {
+            } else if selected.extension().unwrap_or_default() == "tar" {
                 state.tar = true;
+            } else if state.tar {
+                // For files inside tar archive
+                if let Some(tar_cursor) = cursor.as_any_mut().downcast_mut::<TarCursor>() {
+                    let content = tar_cursor.read_file_content(&selected)?;
+                    let mut temp_file = NamedTempFile::new()?;
+                    temp_file.write_all(&content)?;
+                    run_prog("bat", temp_file.path())?;
+                }
             } else {
-                run_prog("bat", &cursor.selected())?
+                run_prog("bat", &selected)?
             }
         }
         OpType::Opdot => cursor.toggle_hidden_files()?,

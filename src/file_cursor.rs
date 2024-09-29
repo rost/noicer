@@ -274,6 +274,14 @@ impl Cursor for FileCursor {
             .unwrap_or(0) as i32;
         Ok(pos)
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 impl Default for FileCursor {

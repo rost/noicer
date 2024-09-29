@@ -177,8 +177,7 @@ fn run_op(
                 cursor.move_in()?
             } else if selected.extension().unwrap_or_default() == "tar" {
                 state.tar = true;
-            } else if state.tar {
-                // For files inside tar archive
+            } else if state.tar && !selected.ends_with("..") {
                 if let Some(tar_cursor) = cursor.as_any_mut().downcast_mut::<TarCursor>() {
                     let content = tar_cursor.read_file_content(&selected)?;
                     let mut temp_file = NamedTempFile::new()?;
